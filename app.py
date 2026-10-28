@@ -42,27 +42,18 @@ def get_player(uid):
 def vals(p):
     if not p: return (1,20,0,15,50)
     try:
-        l = p.get("level",1) if hasattr(p,'get') else p["level"]
-        h = p.get("hp",20) if hasattr(p,'get') else p["hp"]
-        r = p.get("rubin",0) if hasattr(p,'get') else 0
-        g = p.get("gold",15) if hasattr(p,'get') else 15
-        s = p.get("silver",50) if hasattr(p,'get') else 50
-        # sqlite Row
-        if not hasattr(p,'get'):
-            try: l = p["level"]
-            except: l=1
-            try: h = p["hp"]
-            except: h=20
-            try: g = p["gold"]
-            except: g=15
-            try: s = p["silver"]
-            except: s=50
-            try: r = p["rubin"]
-            except: r=0
+        if hasattr(p,'get'):
+            l = p.get("level",1); h = p.get("hp",20); r = p.get("rubin",0); g = p.get("gold",15); s = p.get("silver",50)
+        else:
+            l = p["level"] if "level" in p.keys() else 1
+            h = p["hp"] if "hp" in p.keys() else 20
+            g = p["gold"] if "gold" in p.keys() else 15
+            s = p["silver"] if "silver" in p.keys() else 50
+            r = p["rubin"] if "rubin" in p.keys() else 0
     except: l,h,r,g,s = 1,20,0,15,50
     return l,h,r,g,s
 
-CSS = """<style>body{margin:0;background:#2b2218;font-family:Arial}.wrap{max-width:480px;margin:0 auto;min-height:100vh;background:#d2b87e;position:relative}.topbar{background:#e6c78f;border-bottom:3px solid #5a3e22;display:flex;justify-content:center;padding:6px}.top-scroll{background:#fdf6c8;border:2px solid #8a6a3d;border-radius:12px;padding:5px 10px;display:flex;gap:10px;font-weight:bold;font-size:14px}.frame{margin:8px;background:#3d2817;padding:8px;border-radius:4px}.frame-inner{position:relative;background:#000;height:220px;overflow:hidden;border:2px solid #2b1a0e}.frame-inner img{width:100%;height:100%;object-fit:cover}.label{margin:-14px auto 0;width:260px;background:#f5e6c0;border:2px solid #5a3e22;text-align:center;padding:10px;font-weight:bold;border-radius:8px}.btn-orange{display:block;width:90%;margin:10px auto;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:6px;padding:12px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none}.bottom{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#5a321a;color:#f5e6c0;display:flex;justify-content:space-between;padding:10px 16px;font-size:13px}</style>"""
+CSS = """<style>body{margin:0;background:#2b2218;font-family:Arial}.wrap{max-width:480px;margin:0 auto;min-height:100vh;background:#d2b87e;position:relative}.topbar{background:#e6c78f;border-bottom:3px solid #5a3e22;display:flex;justify-content:center;padding:6px}.top-scroll{background:#fdf6c8;border:2px solid #8a6a3d;border-radius:12px;padding:5px 10px;display:flex;gap:12px;font-weight:bold;font-size:14px}.frame{margin:8px;background:#3d2817;padding:8px;border-radius:4px}.frame-inner{position:relative;background:#000;height:240px;overflow:hidden;border:2px solid #2b1a0e}.frame-inner img{width:100%;height:100%;object-fit:cover}.btn-orange{display:block;width:90%;margin:10px auto;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:6px;padding:12px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none}.bottom{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#5a321a;color:#f5e6c0;display:flex;justify-content:space-between;padding:10px 16px;font-size:13px}</style>"""
 
 @app.route("/camp.jpg")
 def camp_img():
@@ -111,14 +102,14 @@ def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top=f'<div class="topbar"><div class="top-scroll"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_template_string(CSS+f"""<div class="wrap">{top}<div class="frame"><div class="frame-inner"><img src="/camp.jpg" onerror="this.src='https://i.imgur.com/8Km9tLL.jpg'"><a href="/camp" class="btn-orange">🏕️ Лагерь</a><a href="/promysel" class="btn-orange" style="background:linear-gradient(#aed581,#689f38)">🌲 Промысел</a><div style="height:60px"></div><div class="bottom"><span>Меню</span><span>warriors</span><span><a href="/logout" style="color:#f5e6c0;text-decoration:none">Выход</a></span></div></div>""")
+    return render_template_string(CSS+f"""<div class="wrap">{top}<div class="frame"><div class="frame-inner"><img src="/camp.jpg"></div></div><a href="/camp" class="btn-orange">🏕️ Лагерь</a><a href="/promysel" class="btn-orange" style="background:linear-gradient(#aed581,#689f38)">🌲 Промысел</a><div style="height:60px"></div><div class="bottom"><span>Меню</span><span>warriors</span><span><a href="/logout" style="color:#f5e6c0;text-decoration:none">Выход</a></span></div></div>""")
 
 @app.route("/camp")
 def camp():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top=f'<div class="topbar"><div class="top-scroll"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_template_string(CSS+f"""<div class="wrap">{top}<div style="padding:10px"><h3>Лагерь</h3><div class="frame"><div class="frame-inner" style="height:160px"><img src="/camp.jpg"></div></div><p style="background:#f5e6c0;padding:10px;border:2px solid #5a3e22">Твой лагерь. Отдыхай и тренируйся.</p><a href="/school" class="btn-orange">⚔️ Тренировка с манекеном</a><a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
+    return render_template_string(CSS+f"""<div class="wrap">{top}<div style="padding:10px"><h3>Лагерь</h3><div class="frame"><div class="frame-inner" style="height:160px"><img src="/camp.jpg"></div></div><p style="background:#f5e6c0;padding:10px;border:2px solid #5a3e22">Твой лагерь.</p><a href="/school" class="btn-orange">⚔️ Тренировка</a><a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
 
 @app.route("/school", methods=["GET","POST"])
 def school():
@@ -148,7 +139,7 @@ def promysel():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top=f'<div class="topbar"><div class="top-scroll"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_template_string(CSS+f"""<div class="wrap">{top}<div style="padding:10px"><h3>Промысел</h3><p style="background:#f5e6c0;padding:10px;border:2px solid #5a3e22">Ищешь в лесу. Дает серебро.</p><form method="post" action="/promysel_go"><button class="btn-orange">🌿 Искать</button></form><a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
+    return render_template_string(CSS+f"""<div class="wrap">{top}<div style="padding:10px"><h3>Промысел</h3><p style="background:#f5e6c0;padding:10px;border:2px solid #5a3e22">Ищешь в лесу.</p><form method="post" action="/promysel_go"><button class="btn-orange">🌿 Искать</button></form><a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
 
 @app.route("/promysel_go", methods=["POST"])
 def promysel_go():
