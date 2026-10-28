@@ -1,5 +1,5 @@
 import os, random
-from flask import Flask, request, redirect, session, render_template_string
+from flask import Flask, request, redirect, session, render_template_string, send_from_directory
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -20,200 +20,202 @@ def get_db():
 def init_db():
     try:
         conn = get_db(); cur = conn.cursor()
-        q = """
-        CREATE TABLE IF NOT EXISTS players (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            login TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            gold INT DEFAULT 10,
-            exp INT DEFAULT 0,
-            level INT DEFAULT 1,
-            hp INT DEFAULT 30
-        );""" if DATABASE_URL else """
-        CREATE TABLE IF NOT EXISTS players (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            login TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            gold INT DEFAULT 10,
-            exp INT DEFAULT 0,
-            level INT DEFAULT 1,
-            hp INT DEFAULT 30
-        );"""
-        cur.execute(q); conn.commit(); cur.close(); conn.close()
-    except Exception as e: print(e)
-
+        if DATABASE_URL:
+            cur.execute("""CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)""")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS silver INT DEFAULT 50")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS rubin INT DEFAULT 0")
+        else:
+            cur.execute("""CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)""")
+            try: cur.execute("ALTER TABLE players ADD COLUMN silver INT DEFAULT 50")
+            except: pass
+            try: cur.execute("ALTER TABLE players ADD COLUMN rubin INT DEFAULT 0")
+            except: pass
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e: print("init", e)
 init_db()
 
-BASE_CSS = """
+MOBI_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap');
-body{margin:0;background:#d5c6a5;font-family:Arial}
-.wrap{max-width:480px;margin:0 auto;min-height:100vh;background:#fdf6e3;padding:14px;box-sizing:border-box;border-left:3px double #8d7a5a;border-right:3px double #8d7a5a}
-.logo{text-align:center} .logo h1{font-family:'Cinzel',serif;font-size:30px;color:#2b1d11;margin:6px}
-.card{background:#fbf0c8;border:2px solid #b89a66;border-radius:12px;padding:12px 14px;margin:10px 0}
-.card input{width:100%;border:0;background:transparent;font-size:18px;outline:none}
-.btn{width:100%;padding:14px;background:#5a3523;color:#fbe9c5;border:0;border-radius:12px;font-size:18px;font-weight:bold;cursor:pointer;box-shadow:0 4px 0 #2b1d11;margin-top:10px;display:block;text-align:center;text-decoration:none}
-.top{display:flex;justify-content:space-between;background:#3e2723;color:#f5e6c8;padding:10px 12px;border-radius:8px;font-size:14px}
-.hpbar{height:14px;background:#444;border-radius:7px;overflow:hidden;margin:6px 0}
-.hpfill{height:100%;transition:0.3s}
-.my{background:#4caf50} .enemy{background:#d32f2f}
-.log{background:#fff8dc;border:1px dashed #b89a66;padding:8px;border-radius:8px;height:160px;overflow:auto;font-size:13px;line-height:1.4}
-.move{border:2px solid #8d6e63;border-radius:10px;padding:10px;margin:6px 0;background:#efebe9;cursor:pointer;text-align:left;width:100%}
+body{margin:0;background:#2b2218;font-family:Arial}
+.wrap{max-width:480px;margin:0 auto;min-height:100vh;background:#d2b87e;position:relative}
+.topbar{background:#e6c78f;border-bottom:3px solid #5a3e22;display:flex;justify-content:center;padding:6px}
+.top-scroll{background:#fdf6c8;border:2px solid #8a6a3d;border-radius:12px;padding:5px 10px;display:flex;gap:10px;font-weight:bold;font-size:14px;box-shadow:inset 0 2px 0 #fff;flex-wrap:wrap;justify-content:center}
+.frame{margin:8px;background:#3d2817;padding:8px;border-radius:4px;box-shadow:0 0 0 3px #7a5a33,0 0 0 6px #3d2817}
+.frame-inner{position:relative;background:#000;height:220px;overflow:hidden;border:2px solid #2b1a0e}
+.frame-inner img{width:100%;height:100%;object-fit:cover}
+.label{margin:-14px auto 0;width:260px;background:#f5e6c0;border:2px solid #5a3e22;text-align:center;padding:10px;font-weight:bold;font-family:serif;border-radius:8px}
+.btn-orange{display:block;width:90%;margin:10px auto;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:6px;padding:12px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none;box-shadow:0 3px 0 #5a3e22}
+.btn-row{display:flex;background:#e8d9b0;border:2px solid #5a3e22;margin:8px;border-radius:6px;padding:6px;align-items:center;justify-content:space-between}
+.bottom{position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:#5a321a;color:#f5e6c0;display:flex;justify-content:space-between;padding:10px 16px;font-size:13px}
 </style>
 """
 
-LOGIN = BASE_CSS+"""<div class="wrap"><div class="logo"><h1>BATTLE OF<br>WARRIORS</h1><div style="font-size:50px">⚔️</div></div>
-{% if err %}<div style="background:#ffcdd2;padding:10px;border-radius:8px;color:#b71c1c">{{err}}</div>{% endif %}
-<form method="post"><div class="card"><input name="login" placeholder="Логин" required></div><div class="card"><input name="password" type="password" placeholder="Пароль" required></div><button class="btn">Вход</button></form>
-<div style="text-align:center;margin-top:12px"><a href="/reg" style="color:#5a3523;font-weight:bold">Регистрация</a></div></div>"""
+def get_player(uid):
+    conn=get_db(); cur=conn.cursor()
+    if DATABASE_URL: cur.execute("SELECT * FROM players WHERE id=%s",(uid,))
+    else: cur.execute("SELECT * FROM players WHERE id=?",(uid,))
+    p=cur.fetchone(); cur.close(); conn.close()
+    return p
 
-REG = BASE_CSS+"""<div class="wrap"><div class="logo"><h1>BATTLE OF<br>WARRIORS</h1></div><h3 style="text-align:center;font-family:Cinzel">Регистрация</h3>
-{% if err %}<div style="background:#ffcdd2;padding:10px;border-radius:8px;color:#b71c1c">{{err}}</div>{% endif %}
-<form method="post"><div class="card"><input name="name" placeholder="Имя героя" required></div><div class="card"><input name="login" placeholder="Логин" required minlength="3"></div><div class="card"><input name="password" type="password" placeholder="Пароль" required></div><button class="btn">Начать игру</button></form>
-<div style="text-align:center;margin-top:12px">Есть аккаунт? <a href="/">Войти</a></div></div>"""
+def topbar_html(p):
+    lvl = p["level"] if DATABASE_URL else p[7] if len(p)>7 else 1
+    gold = p["gold"] if DATABASE_URL else p[4] if len(p)>4 else 15
+    silver = p["silver"] if DATABASE_URL else (p["silver"] if "silver" in p.keys() else 50) if not DATABASE_URL else p.get("silver",50)
+    # safe fallback
+    try: silver = p["silver"]
+    except: silver = 50
+    try: rubin = p["rubin"]
+    except: rubin = 0
+    try: hp = p["hp"]
+    except: hp = 20
+    if not DATABASE_URL:
+        lvl = p["level"] if "level" in p.keys() else 1
+        gold = p["gold"] if "gold" in p.keys() else 15
+    return f'<div class="topbar"><div class="top-scroll"><span>⭐ {lvl}</span><span>❤️ {hp}</span><span>💎 {rubin}</span><span>🪙 {gold}</span><span>⚪ {silver}</span></div></div>'
 
-CAMP = BASE_CSS+"""
-<div class="wrap"><div class="top"><span>{{p[1]}} [{{p[5]}} lvl]</span><span>💰{{p[3]}} ⭐{{p[4]}}</span></div>
-<h2 style="font-family:Cinzel;text-align:center">Лагерь</h2>
-<a href="/school" class="btn">⚔️ Школа Воинов [Бой с ответкой]</a>
-<a href="/hunt" class="btn" style="background:#6d4c41">🌲 Промысел (скоро)</a>
-<a href="/logout" style="display:block;text-align:center;margin-top:18px">Выход</a></div>"""
-
-SCHOOL = BASE_CSS+"""
+GAME = MOBI_CSS + """
 <div class="wrap">
-<div class="top"><span>Школа</span><span>💰{{gold}} ⭐{{exp}}</span></div>
-<h3 style="text-align:center;font-family:Cinzel">Манекен vs Ты</h3>
-<div style="text-align:center">🪵 vs 🧍</div>
+{{topbar|safe}}
+<div class="frame"><div class="frame-inner"><img src="/camp.jpg" onerror="this.src='https://i.imgur.com/8Km9tLL.jpg'"></div></div>
+<div class="label">Боевой Лагерь</div>
+<a href="/camp" class="btn-orange">🏕️ Лагерь</a>
+<a href="/promysel" class="btn-orange" style="background:linear-gradient(#aed581,#689f38)">🌲 Промысел</a>
+<div class="btn-row"><span>📜 Задания (0/1/0)</span><a href="/quests" class="btn-orange" style="width:auto;margin:0;padding:6px 18px;font-size:14px;text-decoration:none;color:#3d2817">Пасс</a></div>
+<div style="height:60px"></div>
+<div class="bottom"><span>Меню</span><span id="clock">--:--:--</span><span><a href="/logout" style="color:#f5e6c0;text-decoration:none">Выход</a></span></div>
+</div>
+<script>setInterval(()=>{let d=new Date();document.getElementById('clock').innerText=d.toLocaleTimeString('ru-RU')},1000)</script>
+"""
 
-<div style="font-size:12px;margin-top:8px">ТЫ HP: {{my_hp}}/30</div>
-<div class="hpbar"><div class="hpfill my" style="width:{{my_perc}}%"></div></div>
+@app.route("/camp.jpg")
+def camp_img():
+    try: return send_from_directory('.', 'camp.jpg')
+    except: return redirect("https://i.imgur.com/8Km9tLL.jpg")
 
-<div style="font-size:12px">МАНЕКЕН HP: {{hp}}/25</div>
-<div class="hpbar"><div class="hpfill enemy" style="width:{{hp_perc}}%"></div></div>
+@app.route("/")
+def index_root():
+    if "uid" in session: return redirect("/game")
+    return render_template_string(MOBI_CSS+"""
+<div class="wrap" style="display:flex;flex-direction:column;justify-content:center;padding:20px"><h1 style="text-align:center;font-family:serif">BATTLE OF<br>WARRIORS</h1>
+<form method="post" action="/login"><div style="background:#f5e6c0;border:2px solid #5a3e22;padding:10px;margin:8px"><input name="login" placeholder="Логин" style="width:100%;border:0;background:transparent;font-size:18px" required></div>
+<div style="background:#f5e6c0;border:2px solid #5a3e22;padding:10px;margin:8px"><input name="password" type="password" placeholder="Пароль" style="width:100%;border:0;background:transparent;font-size:18px" required></div>
+<button class="btn-orange">Вход</button></form><a href="/reg" style="text-align:center;display:block;margin-top:10px;color:#3d2817;font-weight:bold">Регистрация</a></div>""")
 
-<div class="log">{{log|safe}}</div>
-
-{% if hp>0 and my_hp>0 %}
-<form method="post">
-<button name="m" value="1" class="move">🗡️ Колющий (3-5) - быстрый</button>
-<button name="m" value="2" class="move">⚔️ Режущий (4-6) - точный</button>
-<button name="m" value="3" class="move">🪓 Рубящий (3-7 +25% крит)</button>
-</form>
-{% elif hp<=0 %}
-<div class="card" style="background:#c8e6c9;text-align:center"><b>Победа! Манекен сломан</b><br>+5 exp +{{reward}} gold</div>
-<form method="post"><button name="m" value="reset" class="btn">Новый бой</button></form>
-{% else %}
-<div class="card" style="background:#ffcdd2;text-align:center"><b>Ты проиграл! Тебя вырубили</b><br>HP восстановлено</div>
-<form method="post"><button name="m" value="reset" class="btn">Встать и драться</button></form>
-{% endif %}
-
-<a href="/game" class="btn" style="background:#8d6e63">← В лагерь</a>
-</div>"""
-
-@app.route("/", methods=["GET","POST"])
-def index():
-    if request.method=="POST":
-        login=request.form.get("login","").strip(); pw=request.form.get("password","")
-        conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("SELECT * FROM players WHERE login=%s",(login,))
-        else: cur.execute("SELECT * FROM players WHERE login=?",(login,))
-        row=cur.fetchone(); cur.close(); conn.close()
-        if row and check_password_hash(row[3] if not DATABASE_URL else row["password"], pw):
-            session["uid"]=row[0] if not DATABASE_URL else row["id"]
-            session["my_hp"]=30; session["dummy_hp"]=25; session["log"]="Вышел на арену. Бей!"
-            session["last_dmg"]=0
-            return redirect("/game")
-        return render_template_string(LOGIN, err="Неверный логин/пароль")
-    return render_template_string(LOGIN, err=None)
+@app.route("/login", methods=["POST"])
+def login():
+    login=request.form.get("login","").strip(); pw=request.form.get("password","")
+    conn=get_db(); cur=conn.cursor()
+    if DATABASE_URL: cur.execute("SELECT * FROM players WHERE login=%s",(login,))
+    else: cur.execute("SELECT * FROM players WHERE login=?",(login,))
+    row=cur.fetchone(); cur.close(); conn.close()
+    if row and check_password_hash(row["password"] if DATABASE_URL else row[3], pw):
+        session["uid"]=row["id"] if DATABASE_URL else row["id"]; session["my_hp"]=20; session["dummy_hp"]=25; session["log"]="В лагере"
+        return redirect("/game")
+    return "Неверный логин/пароль <a href='/'>назад</a>"
 
 @app.route("/reg", methods=["GET","POST"])
 def reg():
     if request.method=="POST":
         name=request.form.get("name","").strip(); login=request.form.get("login","").strip(); pw=request.form.get("password","")
-        if len(name)<2 or len(login)<3 or len(pw)<3: return render_template_string(REG, err="Имя от 2, логин/пароль от 3")
         conn=get_db(); cur=conn.cursor()
         try:
             h=generate_password_hash(pw)
-            if DATABASE_URL:
-                cur.execute("INSERT INTO players (name,login,password) VALUES (%s,%s,%s) RETURNING id",(name,login,h)); uid=cur.fetchone()["id"]
-            else:
-                cur.execute("INSERT INTO players (name,login,password) VALUES (?,?,?)",(name,login,h)); uid=cur.lastrowid
-            conn.commit(); session["uid"]=uid; session["my_hp"]=30; session["dummy_hp"]=25; session["log"]="Новый боец на арене!"
-        except Exception:
-            conn.rollback(); return render_template_string(REG, err="Логин занят")
+            if DATABASE_URL: cur.execute("INSERT INTO players (name,login,password,gold,silver,rubin) VALUES (%s,%s,%s,15,50,0) RETURNING id",(name,login,h)); uid=cur.fetchone()["id"]
+            else: cur.execute("INSERT INTO players (name,login,password,gold,silver,rubin) VALUES (?,?,?,15,50,0)",(name,login,h)); uid=cur.lastrowid
+            conn.commit(); session["uid"]=uid; session["my_hp"]=20; session["dummy_hp"]=25
+        except Exception as e: print(e); conn.rollback(); return "Логин занят <a href='/reg'>назад</a>"
         finally: cur.close(); conn.close()
         return redirect("/game")
-    return render_template_string(REG, err=None)
+    return render_template_string(MOBI_CSS+"""<div class="wrap" style="padding:20px"><h2 style="text-align:center">Регистрация</h2>
+<form method="post"><div style="background:#f5e6c0;border:2px solid #5a3e22;padding:10px;margin:8px"><input name="name" placeholder="Имя героя" style="width:100%;border:0;background:transparent" required></div>
+<div style="background:#f5e6c0;border:2px solid #5a3e22;padding:10px;margin:8px"><input name="login" placeholder="Логин" style="width:100%;border:0;background:transparent" required></div>
+<div style="background:#f5e6c0;border:2px solid #5a3e22;padding:10px;margin:8px"><input name="password" type="password" placeholder="Пароль" style="width:100%;border:0;background:transparent" required></div>
+<button class="btn-orange">Начать</button></form></div>""")
 
 @app.route("/game")
 def game():
     if "uid" not in session: return redirect("/")
-    conn=get_db(); cur=conn.cursor()
-    if DATABASE_URL: cur.execute("SELECT * FROM players WHERE id=%s",(session["uid"],))
-    else: cur.execute("SELECT * FROM players WHERE id=?",(session["uid"],))
-    p=cur.fetchone(); cur.close(); conn.close()
-    if not p: return redirect("/logout")
-    return render_template_string(CAMP, p=p)
+    p=get_player(session["uid"])
+    top=topbar_html(p)
+    return render_template_string(GAME, topbar=top)
+
+@app.route("/camp")
+def camp():
+    if "uid" not in session: return redirect("/")
+    p=get_player(session["uid"])
+    top=topbar_html(p)
+    return render_template_string(MOBI_CSS+f"""<div class="wrap">{top}<div style="padding:10px">
+<h3 style="text-align:center">Лагерь Воинов</h3>
+<div class="frame"><div class="frame-inner" style="height:160px"><img src="/camp.jpg"></div></div>
+<p style="padding:10px;background:#f5e6c0;border:2px solid #5a3e22">Твой боевой лагерь. Отдых тут. В сундуке меч.</p>
+<a href="/school" class="btn-orange">⚔️ Тренировка с манекеном [бьет в ответ]</a>
+<a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
 
 @app.route("/school", methods=["GET","POST"])
 def school():
     if "uid" not in session: return redirect("/")
     if "dummy_hp" not in session: session["dummy_hp"]=25
-    if "my_hp" not in session: session["my_hp"]=30
-    if "log" not in session: session["log"]="Бой начался!"
-    
+    if "my_hp" not in session: session["my_hp"]=20
+    if "log" not in session: session["log"]="Бой!"
     if request.method=="POST":
         m=request.form.get("m")
-        if m=="reset":
-            session["dummy_hp"]=25; session["my_hp"]=30
-            session["log"]="Новый бой! Ты полон сил.<br>"+session["log"]
-            session.pop("reward",None)
+        if m=="reset": session["dummy_hp"]=25; session["my_hp"]=20; session["log"]="Новый бой!"
         else:
-            # ТВОЙ УДАР
-            dmg=0
-            if m=="1": dmg=random.randint(3,5); name="Колющий"
-            elif m=="2": dmg=random.randint(4,6); name="Режущий"
-            else: dmg=random.randint(3,7); name="Рубящий"
-            crit=False
-            if m=="3" and random.random()<0.25: dmg+=4; crit=True
-            
-            session["dummy_hp"]-=dmg
-            hit_msg = f"<div>⚔️ Ты [{name}] на <b>{dmg}{' КРИТ!' if crit else ''}</b></div>"
-            session["log"]=hit_msg+session["log"]
-
-            # ПРОВЕРКА ПОБЕДЫ
+            dmg=random.randint(3,6) if m!="3" else random.randint(3,7)+ (4 if random.random()<0.25 else 0)
+            session["dummy_hp"]-=dmg; session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
             if session["dummy_hp"]<=0:
-                reward=random.randint(1,3)
+                rew=random.randint(2,5); sil=random.randint(5,10)
                 conn=get_db(); cur=conn.cursor()
-                if DATABASE_URL: cur.execute("UPDATE players SET gold=gold+%s, exp=exp+5 WHERE id=%s",(reward,session["uid"]))
-                else: cur.execute("UPDATE players SET gold=gold+?, exp=exp+5 WHERE id=?",(reward,session["uid"]))
+                if DATABASE_URL: cur.execute("UPDATE players SET gold=gold+%s, silver=silver+%s, exp=exp+5 WHERE id=%s",(rew,sil,session["uid"]))
+                else: cur.execute("UPDATE players SET gold=gold+?, silver=silver+?, exp=exp+5 WHERE id=?",(rew,sil,session["uid"]))
                 conn.commit(); cur.close(); conn.close()
-                session["log"]=f"<div style='color:green'><b>💀 Манекен повержен! +5 exp +{reward}💰</b></div>"+session["log"]
-                session["reward"]=reward
+                session["log"]=f"<b style='color:green'>Победа +{rew}🪙 +{sil}⚪ +5 exp</b><br>"+session["log"]
             else:
-                # ОТВЕТ МАНЕКЕНА
-                edmg=random.randint(2,5)
-                if random.random()<0.15: edmg+=2
-                session["my_hp"]-=edmg
-                session["log"]=f"<div>🪵 Манекен бьет на <b style='color:#b71c1c'>{edmg}</b> в ответ!</div>"+session["log"]
-                if session["my_hp"]<=0:
-                    session["log"]=f"<div style='color:red'><b>☠️ Ты упал без сознания...</b></div>"+session["log"]
+                ed=random.randint(2,4); session["my_hp"]-=ed; session["log"]=f"Манекен бьет {ed} в ответ<br>"+session["log"]
+    p=get_player(session["uid"])
+    top=topbar_html(p)
+    return render_template_string(MOBI_CSS+f"""<div class="wrap">{top}<div style="padding:10px">
+<div style="background:#fff8dc;border:1px dashed #5a3e22;padding:8px;height:120px;overflow:auto">{session["log"]}</div>
+<form method="post" style="margin-top:10px">
+<button name="m" value="1" class="btn-orange">🗡️ Колющий</button>
+<button name="m" value="2" class="btn-orange" style="background:linear-gradient(#ffe082,#ff8c00)">⚔️ Режущий</button>
+<button name="m" value="3" class="btn-orange" style="background:linear-gradient(#ffab91,#d32f2f)">🪓 Рубящий</button>
+<button name="m" value="reset" class="btn-orange" style="background:#d2b87e">Новый манекен</button>
+</form><a href="/camp" class="btn-orange" style="background:#bcaaa4">← В лагерь</a></div></div>""")
 
+@app.route("/promysel")
+def promysel():
+    if "uid" not in session: return redirect("/")
+    p=get_player(session["uid"]); top=topbar_html(p)
+    return render_template_string(MOBI_CSS+f"""<div class="wrap">{top}<div style="padding:10px">
+<h3 style="text-align:center">Промысел</h3>
+<div class="frame"><div class="frame-inner" style="height:160px;background:#a5d6a7;display:flex;align-items:center;justify-content:center;font-size:60px">🌲🍄🌿</div></div>
+<p style="padding:10px;background:#f5e6c0;border:2px solid #5a3e22">Ищешь травы в лесу. Находки дают серебро и золото.</p>
+<form method="post" action="/promysel_go"><button class="btn-orange">🌿 Искать (момент)</button></form>
+<a href="/game" class="btn-orange" style="background:#d2b87e">← На карту</a></div></div>""")
+
+@app.route("/promysel_go", methods=["POST"])
+def promysel_go():
+    if "uid" not in session: return redirect("/")
+    g=random.randint(1,3); s=random.randint(5,15); r=1 if random.random()<0.1 else 0
     conn=get_db(); cur=conn.cursor()
-    if DATABASE_URL: cur.execute("SELECT gold,exp FROM players WHERE id=%s",(session["uid"],))
-    else: cur.execute("SELECT gold,exp FROM players WHERE id=?",(session["uid"],))
-    row=cur.fetchone(); cur.close(); conn.close()
-    gold=row[0] if not DATABASE_URL else row["gold"]; exp=row[1] if not DATABASE_URL else row["exp"]
-    
-    hp=session["dummy_hp"]; my_hp=session["my_hp"]
-    hp_perc=max(0,int(hp/25*100)); my_perc=max(0,int(my_hp/30*100))
-    reward=session.get("reward",2)
-    return render_template_string(SCHOOL, gold=gold, exp=exp, hp=hp, hp_perc=hp_perc, my_hp=my_hp, my_perc=my_perc, log=session["log"], reward=reward)
+    if DATABASE_URL: cur.execute("UPDATE players SET gold=gold+%s, silver=silver+%s, rubin=rubin+%s WHERE id=%s",(g,s,r,session["uid"]))
+    else: cur.execute("UPDATE players SET gold=gold+?, silver=silver+?, rubin=rubin+? WHERE id=?",(g,s,r,session["uid"]))
+    conn.commit(); cur.close(); conn.close()
+    p=get_player(session["uid"]); top=topbar_html(p)
+    return render_template_string(MOBI_CSS+f"""<div class="wrap">{top}<div style="padding:20px;text-align:center">
+<h3>Добыча!</h3><div style="font-size:50px">🌿</div>
+<p>+{g} 🪙 +{s} ⚪ { '+1 💎' if r else ''}</p>
+<a href="/promysel" class="btn-orange">Искать еще</a>
+<a href="/game" class="btn-orange" style="background:#d2b87e">На карту</a></div></div>""")
+
+@app.route("/quests")
+def quests():
+    p=get_player(session["uid"]); top=topbar_html(p)
+    return render_template_string(MOBI_CSS+f"""<div class="wrap">{top}<div style="padding:20px"><h3>Задания</h3><p>Скоро</p><a href="/game" class="btn-orange">На карту</a></div></div>""")
 
 @app.route("/hunt")
-def hunt(): return BASE_CSS+'<div class="wrap"><h3>Промысел скоро</h3><a href="/game" class="btn">В лагерь</a></div>'
+def hunt(): return redirect("/promysel")
 @app.route("/logout")
 def logout(): session.clear(); return redirect("/")
 if __name__=="__main__": app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
