@@ -152,7 +152,34 @@ def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold;font-size:15px"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = f'<div class="wrap" style="background:#e8d6a8">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e;background:#000"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover;display:block"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div></div>'
+    
+    body = f'''
+    <div class="wrap" style="background:#e8d6a8;min-height:100vh;display:flex;flex-direction:column">
+        {top}
+        <div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px">
+            <div style="height:300px;overflow:hidden;border:2px solid #2b1a0e;background:#000">
+                <img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover;display:block">
+            </div>
+        </div>
+        
+        <div style="display:flex;gap:8px;padding:10px 10px 0 10px">
+            <a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a>
+            <a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a>
+        </div>
+        
+        <div style="padding:10px">
+            <a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a>
+        </div>
+
+        <div style="flex-grow:1"></div>
+
+        <!-- ВОТ ТЕ САМЫЕ КНОПКИ СНИЗУ - теперь такие же как все -->
+        <div style="display:flex;justify-content:space-between;padding:15px 10px;border-top:1px solid #c9a86a;margin-top:10px">
+            <a href="/game" style="background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:12px;padding:10px 28px;font-weight:bold;color:#3d2817;text-decoration:none">Меню</a>
+            <a href="/logout" style="background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:12px;padding:10px 28px;font-weight:bold;color:#3d2817;text-decoration:none">Выход</a>
+        </div>
+    </div>
+    '''
     return render_template_string(CSS+body)
 
 @app.route("/camp")
