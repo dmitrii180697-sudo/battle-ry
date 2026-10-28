@@ -194,6 +194,7 @@ def fight(monster):
         session["enemy_dmg"] = (4,7)
         session["reward_g"] = 5; session["reward_s"] = 20; session["reward_r"] = 1
     session["my_hp"] = 20
+    session["rewarded"] = False  # флаг чтобы награда 1 раз
     session["log"] = f"Ты встретил {session['enemy_name']}!"
     return redirect("/fight_battle")
 
@@ -203,25 +204,35 @@ def fight_battle():
     if "enemy_hp" not in session: return redirect("/promysel")
     if request.method == "POST":
         m = request.form.get("m")
-        if m == "hit":
+        if m == "hit" and session["my_hp"] > 0 and session["enemy_hp"] > 0:
             dmg = random.randint(3,7)
             session["enemy_hp"] -= dmg
             session["log"] = f"Ты бьешь {dmg}<br>" + session["log"]
+            
             if session["enemy_hp"] <= 0:
-                conn=get_db(); cur=conn.cursor()
-                g = session["reward_g"]; s = session["reward_s"]; r = session["reward_r"]
-                if DATABASE_URL:
-                    cur.execute("UPDATE players SET gold=gold+%s, silver=silver+%s, rubin=rubin+%s WHERE id=%s",(g,s,r,session["uid"]))
+                if not session.get("rewarded", False):
+                    try:
+                        conn=get_db(); cur=conn.cursor()
+                        g = session["reward_g"]; s = session["reward_s"]; r = session["reward_r"]
+                        if DATABASE_URL:
+                            cur.execute("UPDATE players SET gold=gold+%s, silver=silver+%s, rubin=rubin+%s WHERE id=%s",(g,s,r,session["uid"]))
+                        else:
+                            cur.execute("UPDATE players SET gold=gold+?, silver=silver+?, rubin=rubin+? WHERE id=?",(g,s,r,session["uid"]))
+                        conn.commit()
+                        cur.close(); conn.close()
+                        session["rewarded"] = True
+                        session["log"] = f"<b style='color:green'>ПОБЕДА! +{g}🪙 +{s}⚪ +{r}💎</b><br>" + session["log"]
+                    except Exception as e:
+                        session["log"] = f"Ошибка награды: {e}<br>" + session["log"]
                 else:
-                    cur.execute("UPDATE players SET gold=gold+?, silver=silver+?, rubin=rubin+? WHERE id=?",(g,s,r,session["uid"]))
-                conn.commit(); cur.close(); conn.close()
-                session["log"] = f"<b style='color:green'>ПОБЕДА! +{g}🪙 +{s}⚪ +{r}💎</b><br>" + session["log"]
+                    session["log"] = f"<b style='color:green'>Уже получил награду</b><br>" + session["log"]
             else:
                 ed = random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
                 session["my_hp"] -= ed
                 session["log"] = f"{session['enemy_name']} бьет {ed} в ответ<br>" + session["log"]
         elif m == "run":
             return redirect("/promysel")
+    
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = '<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold;font-size:15px"><span>⭐ '+str(l)+'</span><span>❤️ '+str(h)+'</span><span>💎 '+str(r)+'</span><span>🪙 '+str(g)+'</span><span>⚪ '+str(s)+'</span></div></div>'
     enemy_hp = max(0, session["enemy_hp"]); enemy_max = session["enemy_max"]; my_hp = max(0, session["my_hp"])
