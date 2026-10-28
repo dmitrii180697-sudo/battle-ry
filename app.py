@@ -7,17 +7,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "battle2026_long_key_123")
 
-# ФИКС ДЛЯ RENDER POSTGRES
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-print(f"DB URL SET: {bool(DATABASE_URL)}")
-
 def get_db():
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
-        return conn
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     else:
         import sqlite3
         conn = sqlite3.connect('/tmp/battle.db')
@@ -28,36 +24,47 @@ def init_db():
     try:
         conn=get_db(); cur=conn.cursor()
         if DATABASE_URL:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS players (
-                    id SERIAL PRIMARY KEY, 
-                    name TEXT, 
-                    login TEXT UNIQUE, 
-                    password TEXT, 
-                    gold INT DEFAULT 15, 
-                    silver INT DEFAULT 50, 
-                    rubin INT DEFAULT 0, 
-                    exp INT DEFAULT 0, 
-                    level INT DEFAULT 1, 
-                    hp INT DEFAULT 20,
-                    created_at TIMESTAMP DEFAULT NOW()
-                )
-            """)
-            # Добавляем колонки если их нет (для старых баз)
+            cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)")
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS gold INT DEFAULT 15")
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS silver INT DEFAULT 50")
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS rubin INT DEFAULT 0")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)")
         conn.commit(); cur.close(); conn.close()
-        print("DB INIT OK")
     except Exception as e:
         print(f"DB INIT ERROR: {e}")
 
 init_db()
 
+def convert_silver(uid):
+    try:
+        conn=get_db(); cur=conn.cursor()
+        if DATABASE_URL: cur.execute("SELECT silver, gold FROM players WHERE id=%s",(uid,))
+        else: cur.execute("SELECT silver, gold FROM players WHERE id=?",(uid,))
+        row=cur.fetchone()
+        if not row: cur.close(); conn.close(); return
+        if isinstance(row, dict) or hasattr(row,'get'):
+            s=row.get("silver",0); g=row.get("gold",0)
+        else:
+            s=row[0]; g=row[1]
+        s=int(s or 0); g=int(g or 0)
+        if s >= 100:
+            add_g = s // 100
+            new_s = s % 100
+            new_g = g + add_g
+            if DATABASE_URL:
+                cur.execute("UPDATE players SET gold=%s, silver=%s WHERE id=%s",(new_g, new_s, uid))
+            else:
+                cur.execute("UPDATE players SET gold=?, silver=? WHERE id=?",(new_g, new_s, uid))
+            conn.commit()
+            print(f"CONVERT {s} silver -> +{add_g} gold for uid={uid}")
+        cur.close(); conn.close()
+    except Exception as e:
+        print(f"CONVERT FAIL {e}")
+
 def get_player(uid):
     try:
+        convert_silver(uid)
         conn=get_db(); cur=conn.cursor()
         if DATABASE_URL: cur.execute("SELECT * FROM players WHERE id=%s",(uid,))
         else: cur.execute("SELECT * FROM players WHERE id=?",(uid,))
@@ -87,6 +94,7 @@ def add_reward(uid, add_g, add_s, add_r):
         else:
             cur.execute("UPDATE players SET gold=COALESCE(gold,0)+?, silver=COALESCE(silver,0)+?, rubin=COALESCE(rubin,0)+? WHERE id=?",(add_g, add_s, add_r, uid))
         conn.commit(); cur.close(); conn.close()
+        convert_silver(uid)
         return True
     except Exception as e:
         print(f"REWARD FAIL {e}")
@@ -102,7 +110,7 @@ def camp_img():
 @app.route("/")
 def root():
     if "uid" in session: return redirect("/game")
-    html = CSS + '<div class="wrap" style="padding:20px"><h1 style="text-align:center">BATTLE OF WARRIORS</h1><form method="post" action="/login"><input name="login" placeholder="Login" style="width:100%;padding:12px;margin:6px 0" required><input name="password" type="password" placeholder="Pass" style="width:100%;padding:12px;margin:6px 0" required><button class="btn-orange">Войти</button></form><a href="/reg" style="display:block;text-align:center;margin-top:10px">Регистрация</a><p style="text-align:center;font-size:12px;color:#5a3e22;margin-top:20px">DB: '+('Postgres ✅ Сохранение вечное' if DATABASE_URL else 'SQLite ⚠️ Временное')+'</p></div>'
+    html = CSS + '<div class="wrap" style="padding:20px"><h1 style="text-align:center">BATTLE OF WARRIORS</h1><form method="post" action="/login"><input name="login" placeholder="Login" style="width:100%;padding:12px;margin:6px 0" required><input name="password" type="password" placeholder="Pass" style="width:100%;padding:12px;margin:6px 0" required><button class="btn-orange">Войти</button></form><a href="/reg" style="display:block;text-align:center;margin-top:10px">Регистрация</a><p style="text-align:center;font-size:12px;color:#5a3e22;margin-top:20px">DB: '+('Postgres ✅ Вечное + 100⚪=1🪙' if DATABASE_URL else 'SQLite ⚠️ Временное')+'</p></div>'
     return render_template_string(html)
 
 @app.route("/login", methods=["POST"])
@@ -132,13 +140,11 @@ def reg():
             if DATABASE_URL: cur.execute("INSERT INTO players (name,login,password,gold,silver,rubin) VALUES (%s,%s,%s,15,50,0) RETURNING id",(name,lg,h)); uid=cur.fetchone()["id"]
             else: cur.execute("INSERT INTO players (name,login,password,gold,silver,rubin) VALUES (?,?,?,15,50,0)",(name,lg,h)); uid=cur.lastrowid
             conn.commit(); cur.close(); conn.close()
-            print(f"NEW PLAYER id={uid} login={lg} SAVED")
             session["uid"]=uid; session["my_hp"]=20; session["log"]="Привет!"
             return redirect("/game")
         except Exception as e: 
-            print(f"REG ERROR {e}")
             return f"Логин занят {e} <a href='/reg'>назад</a>"
-    html = CSS + '<div class="wrap" style="padding:20px"><h2>Регистрация</h2><form method="post"><input name="name" placeholder="Имя персонажа" style="width:100%;padding:10px;margin:5px 0" required><input name="login" placeholder="Логин" style="width:100%;padding:10px;margin:5px 0" required><input name="password" type="password" placeholder="Пароль" style="width:100%;padding:10px;margin:5px 0" required><button class="btn-orange">Создать</button></form></div>'
+    html = CSS + '<div class="wrap" style="padding:20px"><h2>Регистрация</h2><form method="post"><input name="name" placeholder="Имя" style="width:100%;padding:10px;margin:5px 0" required><input name="login" placeholder="Логин" style="width:100%;padding:10px;margin:5px 0" required><input name="password" type="password" placeholder="Пароль" style="width:100%;padding:10px;margin:5px 0" required><button class="btn-orange">Создать</button></form></div>'
     return render_template_string(html)
 
 @app.route("/game")
@@ -146,7 +152,7 @@ def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold;font-size:15px"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = f'<div class="wrap" style="background:#e8d6a8">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e;background:#000"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover;display:block"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div><div style="height:70px"></div></div>'
+    body = f'<div class="wrap" style="background:#e8d6a8">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e;background:#000"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover;display:block"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div></div>'
     return render_template_string(CSS+body)
 
 @app.route("/camp")
@@ -154,7 +160,7 @@ def camp():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;text-align:center"><b>🏕️ Лагерь</b></div><a href="/game" class="btn-orange">← На карту</a></div>'
+    body = top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><a href="/game" class="btn-orange">← На карту</a></div>'
     return render_template_string(CSS+body)
 
 @app.route("/promysel")
@@ -162,7 +168,7 @@ def promysel():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#2b1a0e;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">⚔️</div><div style="flex:1"><b>Древний воин</b><br><small>Опасный противник</small></div><a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#1a2e1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">🐺</div><div style="flex:1"><b>Дух зверя</b><br><small>Дикий и свирепый</small></div><a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><a href="/game" class="btn-orange">← На карту</a></div>'
+    body = top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#2b1a0e;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">⚔️</div><div style="flex:1"><b>Древний воин</b><br><small>2🪙 10⚪</small></div><a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#1a2e1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">🐺</div><div style="flex:1"><b>Дух зверя</b><br><small>5🪙 20⚪ 1💎</small></div><a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><a href="/game" class="btn-orange">← На карту</a></div>'
     return render_template_string(CSS+body)
 
 @app.route("/fight/<monster>")
@@ -202,7 +208,7 @@ def pvp():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_template_string(CSS+top+'<div class="wrap" style="background:#e8d6a8;padding:15px;text-align:center"><h2>⚔️ PVP</h2><p>Скоро: турниры, бои за локации</p><a href="/game" class="btn-orange">← На карту</a></div>')
+    return render_template_string(CSS+top+'<div class="wrap" style="background:#e8d6a8;padding:15px;text-align:center"><h2>⚔️ PVP</h2><p>Скоро</p><a href="/game" class="btn-orange">← На карту</a></div>')
 
 @app.route("/logout")
 def logout(): session.clear(); return redirect("/")
