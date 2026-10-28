@@ -111,7 +111,7 @@ def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top=f'<div class="topbar"><div class="top-scroll"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_template_string(CSS+f"""<div class="wrap">{top}<div class="frame"><div class="frame-inner"><img src="/camp.jpg" onerror="this.src='https://i.imgur.com/8Km9tLL.jpg'"></div></div><div class="label">Боевой Лагерь</div><a href="/camp" class="btn-orange">🏕️ Лагерь</a><a href="/promysel" class="btn-orange" style="background:linear-gradient(#aed581,#689f38)">🌲 Промысел</a><div style="height:60px"></div><div class="bottom"><span>Меню</span><span>warriors</span><span><a href="/logout" style="color:#f5e6c0;text-decoration:none">Выход</a></span></div></div>""")
+    return render_template_string(CSS+f"""<div class="wrap">{top}<div class="frame"><div class="frame-inner"><img src="/camp.jpg" onerror="this.src='https://i.imgur.com/8Km9tLL.jpg'"><a href="/camp" class="btn-orange">🏕️ Лагерь</a><a href="/promysel" class="btn-orange" style="background:linear-gradient(#aed581,#689f38)">🌲 Промысел</a><div style="height:60px"></div><div class="bottom"><span>Меню</span><span>warriors</span><span><a href="/logout" style="color:#f5e6c0;text-decoration:none">Выход</a></span></div></div>""")
 
 @app.route("/camp")
 def camp():
