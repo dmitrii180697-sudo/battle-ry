@@ -151,24 +151,24 @@ def promysel():
 <h3 style="text-align:center;margin:5px">🌲 Промысел - Выбери добычу</h3>
 
 <div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0">
-  <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:10px;display:flex;gap:10px;align-items:center">
+  <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center">
     <div style="width:55px;height:55px;background:#2b1a0e;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">⚔️</div>
     <div style="flex:1">
-      <b>Древний воин</b><br>
-      <small>HP 20 | Урон 2-4<br>Награда: +2🪙 +10⚪</small>
+      <b style="font-size:16px">Древний воин</b><br>
+      <small style="color:#5a3e22">Опасный противник из прошлого</small>
     </div>
-    <a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 14px;color:white;font-weight:bold;text-decoration:none">Бить</a>
+    <a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a>
   </div>
 </div>
 
 <div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0">
-  <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:10px;display:flex;gap:10px;align-items:center">
+  <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center">
     <div style="width:55px;height:55px;background:#1a2e1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">🐺</div>
     <div style="flex:1">
-      <b>Дух зверя</b><br>
-      <small>HP 35 | Урон 4-7<br>Награда: +5🪙 +20⚪ +1💎</small>
+      <b style="font-size:16px">Дух зверя</b><br>
+      <small style="color:#5a3e22">Дикий и свирепый</small>
     </div>
-    <a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 14px;color:white;font-weight:bold;text-decoration:none">Бить</a>
+    <a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a>
   </div>
 </div>
 
