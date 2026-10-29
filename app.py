@@ -225,20 +225,28 @@ def fight_battle():
     if "enemy_hp" not in session: return redirect("/promysel")
     if request.method=="POST":
         m=request.form.get("m")
-                if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
-            dmg=random.randint(3,7); session["enemy_hp"]-=dmg; session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
+                        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
+            dmg=random.randint(3,7)
+            session["enemy_hp"]-=dmg
+            session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
             if session["enemy_hp"]<=0:
                 if not session.get("rewarded"):
                     ok=add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
-                    if ok: 
+                    if ok:
                         session["rewarded"]=True
                         add_win(session["uid"])
                         session["log"]=f"<b style='color:green'>ПОБЕДА! +{session['reward_g']}🪙 +{session['reward_s']}⚪ +{session['reward_r']}💎</b><br>"+session["log"]
             else:
-                ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1]); session["my_hp"]-=ed; session["log"]=f"{session['enemy_name']} бьет {ed}<br>"+session["log"]
+                ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
+                session["my_hp"]-=ed
+                session["log"]=f"{session['enemy_name']} бьет {ed}<br>"+session["log"]
                 if session["my_hp"]<=0:
                     if not session.get("rewarded"):
                         add_loss(session["uid"])
+                        session["rewarded"]=True
+                        session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
+        elif m=="run":
+            return redirect("/promysel")
                         session["rewarded"]=True
                         session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
         elif m=="run": return redirect("/promysel")
