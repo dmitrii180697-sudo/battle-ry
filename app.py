@@ -310,12 +310,10 @@ def hero_page():
     zashita = 0 + add
     lovkost = 4 + add
     shield = 0 + add
-        shield = 0 + add
     # КНОПКА АДМИНКИ - видит только админ
     admin_block = ""
     if session.get("is_admin"):
         admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a><br><a href="/admin/logout" style="color:#ffcccc;font-size:12px;text-decoration:none">выйти</a></div>'
-    html = f"""
     html = f"""
     <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
         <div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center">
