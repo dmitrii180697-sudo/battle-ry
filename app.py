@@ -310,6 +310,12 @@ def hero_page():
     zashita = 0 + add
     lovkost = 4 + add
     shield = 0 + add
+        shield = 0 + add
+    # КНОПКА АДМИНКИ - видит только админ
+    admin_block = ""
+    if session.get("is_admin"):
+        admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a><br><a href="/admin/logout" style="color:#ffcccc;font-size:12px;text-decoration:none">выйти</a></div>'
+    html = f"""
     html = f"""
     <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
         <div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center">
@@ -346,3 +352,135 @@ def logout(): session.clear(); return redirect("/")
 
 if __name__=="__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
+# ===== ADMIN CONFIG =====
+ADMIN_PASSWORD = "admin123"  # <-- ПОМЕНЯЙ ПАРОЛЬ ТУТ
+ADMIN_NICKS = ["admin", "Admin", "ADMIN"]
+
+def is_admin():
+    # если уже залогинен как админ
+    if session.get("is_admin"):
+        return True
+    if "uid" not in session:
+        return False
+    try:
+        p = get_player(session["uid"])
+        if not p:
+            return False
+        nick = p.get("nickname", p.get("name","")) if isinstance(p, dict) or hasattr(p,'get') else ""
+        if nick in ADMIN_NICKS or nick.lower() == "admin":
+            # если это ник admin - требуем пароль один раз
+            return session.get("is_admin", False)
+    except:
+        pass
+    return False
+
+@app.route("/admin/login", methods=["GET","POST"])
+def admin_login():
+    if "uid" not in session:
+        return redirect("/")
+    if request.method == "POST":
+        pwd = request.form.get("pwd","")
+        if pwd == ADMIN_PASSWORD:
+            session["is_admin"] = True
+            return redirect("/admin")
+        else:
+            return render_page('<div style="background:#1a0e0a;padding:20px;min-height:100vh;color:#f5e6c0"><h3>❌ Неверный пароль</h3><a href="/admin/login" style="color:#ffb84d">Назад</a></div>', True)
+    html = """
+    <div class="wrap" style="background:#1a0e0a;padding:20px;min-height:100vh;color:#f5e6c0">
+        <h2 style="text-align:center">🔐 Админ вход</h2>
+        <form method="post" style="background:#f5e6c0;padding:16px;border-radius:12px;max-width:320px;margin:0 auto">
+            <input type="password" name="pwd" placeholder="Пароль админа" style="width:100%;padding:12px;border-radius:8px;border:2px solid #5a3e22;margin-bottom:10px">
+            <button style="width:100%;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;font-weight:bold">Войти</button>
+        </form>
+        <a href="/game" style="display:block;text-align:center;margin-top:14px;color:#f5e6c0">← На карту</a>
+    </div>
+    """
+    return render_page(html, True)
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect("/game")
+
+@app.route("/admin")
+def admin_page():
+    if not is_admin():
+        return redirect("/admin/login")
+    html = """
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;color:#f5e6c0">
+        <h2 style="text-align:center">👑 АДМИН МЕНЮ</h2>
+        <div style="display:grid;gap:10px">
+            <a href="/admin/players" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">👥 Игроки - выдать ресурсы</a>
+            <a href="/admin/monsters" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">👹 Монстры</a>
+            <a href="/admin/locations" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">🗺️ Локации</a>
+            <a href="/admin/quests" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">📜 Задания</a>
+            <a href="/admin/logout" style="background:#600;color:#fff;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">🚪 Выйти из админки</a>
+            <a href="/game" style="background:#666;color:#fff;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">← На карту</a>
+        </div>
+    </div>
+    """
+    return render_page(html, True)
+
+@app.route("/admin/players")
+def admin_players():
+    if not is_admin():
+        return redirect("/admin/login")
+    try:
+        res = supabase.table("players").select("*").order("lvl", desc=True).limit(100).execute()
+        players = res.data
+    except:
+        players = []
+    rows = ""
+    for p in players:
+        uid = p.get("uid","")
+        nick = p.get("nickname", p.get("name","Без имени"))
+        lvl = p.get("lvl",1)
+        g = p.get("gold",0)
+        s = p.get("silver",0)
+        r = p.get("rubin", p.get("rubies",0))
+        rows += f"""
+        <div style="background:#f5e6c0;color:#3d2817;padding:10px;border-radius:10px;margin-bottom:8px">
+            <b>{nick}</b> (lvl {lvl}) - 🪙{g} ⚪{s} 💎{r}<br>
+            <small>{uid[:8]}...</small>
+            <form method="post" action="/admin/players/give" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+                <input type="hidden" name="uid" value="{uid}">
+                <input name="gold" placeholder="+золото" style="width:70px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
+                <input name="silver" placeholder="+серебро" style="width:75px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
+                <input name="rubin" placeholder="+рубины" style="width:70px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
+                <input name="lvl" placeholder="lvl" style="width:50px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
+                <button style="background:#ff8c00;border:none;padding:6px 10px;border-radius:6px;font-weight:bold">Выдать</button>
+            </form>
+        </div>
+        """
+    html = f"""
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh">
+        <h3 style="color:#f5e6c0">👥 Игроки ({len(players)})</h3>
+        {rows}
+        <a href="/admin" style="display:block;margin-top:12px;background:#666;color:#fff;padding:12px;border-radius:10px;text-align:center;text-decoration:none">← Админ меню</a>
+    </div>
+    """
+    return render_page(html, True)
+
+@app.route("/admin/players/give", methods=["POST"])
+def admin_give():
+    if not is_admin():
+        return redirect("/admin/login")
+    uid = request.form.get("uid")
+    try:
+        gold = int(request.form.get("gold") or 0)
+        silver = int(request.form.get("silver") or 0)
+        rubin = int(request.form.get("rubin") or 0)
+        lvl = request.form.get("lvl")
+        p = supabase.table("players").select("*").eq("uid", uid).single().execute().data
+        if not p:
+            return redirect("/admin/players")
+        ng = int(p.get("gold",0)) + gold
+        ns = int(p.get("silver",0)) + silver
+        nr = int(p.get("rubin", p.get("rubies",0))) + rubin
+        upd = {"gold": ng, "silver": ns, "rubin": nr, "rubies": nr}
+        if lvl and lvl.strip()!="":
+            upd["lvl"] = int(lvl)
+        supabase.table("players").update(upd).eq("uid", uid).execute()
+    except Exception as e:
+        print("admin give error", e)
+    return redirect("/admin/players")
