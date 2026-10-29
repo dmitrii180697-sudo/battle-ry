@@ -11,6 +11,25 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# ===== ТВОИ МОНСТРЫ С КАРТИНКАМИ ИЗ STATIC =====
+MONSTERS_CFG = {
+    "warrior": {
+        "name": "Древний воин",
+        "img": "ancient_warrior.png",
+        "hp": 20,
+        "dmg": (2,4),
+        "gold": 2, "silver": 10, "rubin": 0
+    },
+    "beast": {
+        "name": "Дух зверя",
+        "img": "beast_spirit.png",
+        "hp": 35,
+        "dmg": (4,7),
+        "gold": 5, "silver": 20, "rubin": 1
+    }
+}
+HERO_IMG = "barbarian_game_size.png" # твой варвар с дубинкой
+
 def get_db():
     if DATABASE_URL:
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
@@ -25,15 +44,8 @@ def init_db():
         conn=get_db(); cur=conn.cursor()
         if DATABASE_URL:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
-            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INT DEFAULT 1")
-            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INT DEFAULT 0")
-            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS exp INT DEFAULT 0")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
-            try: cur.execute("ALTER TABLE players ADD COLUMN wins INT DEFAULT 1")
-            except: pass
-            try: cur.execute("ALTER TABLE players ADD COLUMN losses INT DEFAULT 0")
-            except: pass
         conn.commit(); cur.close(); conn.close()
     except Exception as e:
         print(f"DB INIT ERROR: {e}")
@@ -147,10 +159,14 @@ def render_page(inner_html, show_menu=True):
     menu = MENU_HTML if show_menu else ""
     return render_template_string(BASE_CSS + inner_html + menu)
 
+# ==== СТАТИКА - ТЕПЕРЬ ИЗ ПАПКИ static ====
 @app.route("/camp.jpg")
 def camp_img():
-    try: return send_from_directory('.','camp.jpg')
-    except: return redirect("https://i.imgur.com/8Km9tLL.jpg")
+    return send_from_directory('static','camp.jpg')
+
+@app.route("/static/<path:filename>")
+def static_files(filename):
+    return send_from_directory('static', filename)
 
 @app.route("/")
 def root():
@@ -193,7 +209,7 @@ def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = f'<div class="wrap" style="background:#e8d6a8;min-height:100vh;display:flex;flex-direction:column">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div><div style="flex-grow:1"></div></div>'
+    body = f'<div class="wrap" style="background:#e8d6a8;min-height:100vh;display:flex;flex-direction:column">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/static/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div><div style="flex-grow:1"></div></div>'
     return render_page(body, True)
 
 @app.route("/camp")
@@ -201,22 +217,48 @@ def camp():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_page(top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><a href="/game" class="btn-orange">← На карту</a></div>', True)
+    return render_page(top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/static/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><a href="/game" class="btn-orange">← На карту</a></div>', True)
 
 @app.route("/promysel")
 def promysel():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#2b1a0e;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">⚔️</div><div style="flex:1"><b>Древний воин</b><br><small>2🪙 10⚪</small></div><a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0"><div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center"><div style="width:55px;height:55px;background:#1a2e1a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:28px">🐺</div><div style="flex:1"><b>Дух зверя</b><br><small>5🪙 20⚪ 1💎</small></div><a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a></div></div><a href="/game" class="btn-orange">← На карту</a></div>'
+    body = top + f'''
+    <div class="wrap" style="background:#e8d6a8;padding:10px">
+    <h3 style="text-align:center">🌲 Промысел - ТВОИ МОНСТРЫ</h3>
+    <div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0">
+      <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center">
+        <img src="/static/{MONSTERS_CFG["warrior"]["img"]}" style="width:55px;height:55px;object-fit:contain;background:#2b1a0e;border-radius:4px">
+        <div style="flex:1"><b>{MONSTERS_CFG["warrior"]["name"]}</b><br><small>{MONSTERS_CFG["warrior"]["gold"]}🪙 {MONSTERS_CFG["warrior"]["silver"]}⚪</small></div>
+        <a href="/fight/warrior" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a>
+      </div>
+    </div>
+    <div style="background:#3d2817;padding:6px;border-radius:6px;margin:10px 0">
+      <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:6px;padding:12px;display:flex;gap:12px;align-items:center">
+        <img src="/static/{MONSTERS_CFG["beast"]["img"]}" style="width:55px;height:55px;object-fit:contain;background:#1a2e1a;border-radius:4px">
+        <div style="flex:1"><b>{MONSTERS_CFG["beast"]["name"]}</b><br><small>{MONSTERS_CFG["beast"]["gold"]}🪙 {MONSTERS_CFG["beast"]["silver"]}⚪ {MONSTERS_CFG["beast"]["rubin"]}💎</small></div>
+        <a href="/fight/beast" style="background:linear-gradient(#ff6b6b,#c92a2a);border:2px solid #5a3e22;border-radius:6px;padding:8px 16px;color:white;font-weight:bold;text-decoration:none">Бить</a>
+      </div>
+    </div>
+    <a href="/game" class="btn-orange">← На карту</a></div>'''
     return render_page(body, True)
 
 @app.route("/fight/<monster>")
 def fight(monster):
     if "uid" not in session: return redirect("/")
-    if monster=="warrior": session["enemy_name"]="Древний воин"; session["enemy_hp"]=20; session["enemy_max"]=20; session["enemy_dmg"]=(2,4); session["reward_g"]=2; session["reward_s"]=10; session["reward_r"]=0
-    else: session["enemy_name"]="Дух зверя"; session["enemy_hp"]=35; session["enemy_max"]=35; session["enemy_dmg"]=(4,7); session["reward_g"]=5; session["reward_s"]=20; session["reward_r"]=1
-    session["my_hp"]=20; session["rewarded"]=False; session["log"]=f"Встретил {session['enemy_name']}!"
+    cfg = MONSTERS_CFG.get(monster, MONSTERS_CFG["warrior"])
+    session["enemy_name"]=cfg["name"]
+    session["enemy_img"]=cfg["img"]
+    session["enemy_hp"]=cfg["hp"]
+    session["enemy_max"]=cfg["hp"]
+    session["enemy_dmg"]=cfg["dmg"]
+    session["reward_g"]=cfg["gold"]
+    session["reward_s"]=cfg["silver"]
+    session["reward_r"]=cfg["rubin"]
+    session["my_hp"]=20
+    session["rewarded"]=False
+    session["log"]=f"Встретил {cfg['name']}!"
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET","POST"])
@@ -253,11 +295,16 @@ def fight_battle():
     mh=max(0, session["my_hp"])
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
+    enemy_img = session.get("enemy_img","ancient_warrior.png")
     html=f"""
     <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh">
         <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
             <div style="font-weight:bold;margin-bottom:6px">{session['enemy_name']} HP: {eh}/{session['enemy_max']}</div>
             <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px">
+            <img src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
+            <img src="/static/{enemy_img}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
         </div>
         <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
             <div style="font-weight:bold;margin-bottom:6px">Ты HP: {mh}/20</div>
@@ -265,7 +312,7 @@ def fight_battle():
         </div>
         <div style="background:#000;color:#0f0;padding:8px;border-radius:8px;height:120px;overflow:auto;margin-bottom:10px;font-size:13px">{session['log']}</div>
         <form method="post" style="display:flex;gap:8px">
-            <button name="m" value="hit" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР</button>
+            <button name="m" value="hit" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР ДУБИНОЙ</button>
             <button name="m" value="run" style="flex:1;background:#ccc;border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🏃 БЕГ</button>
         </form>
     </div>
@@ -292,18 +339,14 @@ def quests(): return render_page('<div class="wrap" style="padding:20px"><h2>�
 @app.route("/online")
 def online(): return render_page('<div class="wrap" style="padding:20px"><h2>🟢 Онлайн скоро</h2><a href="/game" class="btn-orange">← На карту</a></div>', True)
 @app.route("/hero")
-@app.route("/hero")
 def hero_page():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    # --- АВТО-АДМИН СРАЗУ ---
     try:
-        nick = p.get("nickname", p.get("name","")) if isinstance(p, dict) or hasattr(p,'get') else ""
+        nick = p.get("name","") if isinstance(p, dict) or hasattr(p,'get') else ""
         if nick.lower() == "admin":
             session["is_admin"] = True
-    except:
-        pass
-    # --- КОНЕЦ АВТО-АДМИН ---
+    except: pass
     lvl = max(1, 1)
     try:
         wins = int(p.get("wins",1) if isinstance(p, dict) or hasattr(p,'get') else 1)
@@ -318,14 +361,8 @@ def hero_page():
     zashita = 0 + add
     lovkost = 4 + add
     shield = 0 + add
-    # КНОПКА АДМИНКИ - видит только админ
     admin_block = ""
-    try:
-        nick_tmp = p.get("nickname","").lower() if isinstance(p, dict) else ""
-    except:
-        nick_tmp = ""
-    if nick_tmp == "admin" or session.get("is_admin"):
-        session["is_admin"] = True
+    if session.get("is_admin"):
         admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center;margin:10px"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a></div>'
     html = f"""
     <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
@@ -344,6 +381,7 @@ def hero_page():
                 <div style="display:flex;flex-direction:column;gap:12px">
                     <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;">🏅 ПОБЕДЫ ИГРОКОВ 0</div>
                     <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;font-size:18px;line-height:1.1;">⚔️ ПОБЕДЫ / ПОРАЖЕНИЯ<br><span style="font-size:24px">{wins}/{losses}</span></div>
+                    <img src="/static/{HERO_IMG}" style="width:100%;background:#2b1a0e;border-radius:12px;padding:10px;box-sizing:border-box">
                 </div>
                 <div style="display:flex;flex-direction:column;gap:8px">
                     <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">❤️ ЖИЗНЬ {life}</div>
@@ -359,31 +397,24 @@ def hero_page():
     </div>
     """
     return render_page(html, True)
+
 @app.route("/logout")
 def logout(): session.clear(); return redirect("/")
 
-if __name__=="__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
-# ===== ADMIN CONFIG =====
-ADMIN_PASSWORD = "admin123"  # <-- ПОМЕНЯЙ ПАРОЛЬ ТУТ
-ADMIN_NICKS = ["admin", "Admin", "ADMIN"]
+ADMIN_PASSWORD = "admin123"
 
 def is_admin():
-    # если уже залогинен как админ
     if session.get("is_admin"):
         return True
     if "uid" not in session:
         return False
     try:
         p = get_player(session["uid"])
-        if not p:
-            return False
-        nick = p.get("nickname", p.get("name","")) if isinstance(p, dict) or hasattr(p,'get') else ""
-        if nick in ADMIN_NICKS or nick.lower() == "admin":
-            # если это ник admin - требуем пароль один раз
+        if not p: return False
+        nick = p.get("name","") if isinstance(p, dict) or hasattr(p,'get') else ""
+        if nick.lower() == "admin":
             return session.get("is_admin", False)
-    except:
-        pass
+    except: pass
     return False
 
 @app.route("/admin/login", methods=["GET","POST"])
@@ -422,10 +453,7 @@ def admin_page():
     <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;color:#f5e6c0">
         <h2 style="text-align:center">👑 АДМИН МЕНЮ</h2>
         <div style="display:grid;gap:10px">
-            <a href="/admin/players" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">👥 Игроки - выдать ресурсы</a>
-            <a href="/admin/monsters" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">👹 Монстры</a>
-            <a href="/admin/locations" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">🗺️ Локации</a>
-            <a href="/admin/quests" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">📜 Задания</a>
+            <a href="/admin/players" style="background:#f5e6c0;color:#3d2817;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">👥 Игроки</a>
             <a href="/admin/logout" style="background:#600;color:#fff;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">🚪 Выйти из админки</a>
             <a href="/game" style="background:#666;color:#fff;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none">← На карту</a>
         </div>
@@ -433,66 +461,5 @@ def admin_page():
     """
     return render_page(html, True)
 
-@app.route("/admin/players")
-def admin_players():
-    if not is_admin():
-        return redirect("/admin/login")
-    try:
-        res = supabase.table("players").select("*").order("lvl", desc=True).limit(100).execute()
-        players = res.data
-    except:
-        players = []
-    rows = ""
-    for p in players:
-        uid = p.get("uid","")
-        nick = p.get("nickname", p.get("name","Без имени"))
-        lvl = p.get("lvl",1)
-        g = p.get("gold",0)
-        s = p.get("silver",0)
-        r = p.get("rubin", p.get("rubies",0))
-        rows += f"""
-        <div style="background:#f5e6c0;color:#3d2817;padding:10px;border-radius:10px;margin-bottom:8px">
-            <b>{nick}</b> (lvl {lvl}) - 🪙{g} ⚪{s} 💎{r}<br>
-            <small>{uid[:8]}...</small>
-            <form method="post" action="/admin/players/give" style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
-                <input type="hidden" name="uid" value="{uid}">
-                <input name="gold" placeholder="+золото" style="width:70px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
-                <input name="silver" placeholder="+серебро" style="width:75px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
-                <input name="rubin" placeholder="+рубины" style="width:70px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
-                <input name="lvl" placeholder="lvl" style="width:50px;padding:4px;border-radius:6px;border:1px solid #5a3e22">
-                <button style="background:#ff8c00;border:none;padding:6px 10px;border-radius:6px;font-weight:bold">Выдать</button>
-            </form>
-        </div>
-        """
-    html = f"""
-    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh">
-        <h3 style="color:#f5e6c0">👥 Игроки ({len(players)})</h3>
-        {rows}
-        <a href="/admin" style="display:block;margin-top:12px;background:#666;color:#fff;padding:12px;border-radius:10px;text-align:center;text-decoration:none">← Админ меню</a>
-    </div>
-    """
-    return render_page(html, True)
-
-@app.route("/admin/players/give", methods=["POST"])
-def admin_give():
-    if not is_admin():
-        return redirect("/admin/login")
-    uid = request.form.get("uid")
-    try:
-        gold = int(request.form.get("gold") or 0)
-        silver = int(request.form.get("silver") or 0)
-        rubin = int(request.form.get("rubin") or 0)
-        lvl = request.form.get("lvl")
-        p = supabase.table("players").select("*").eq("uid", uid).single().execute().data
-        if not p:
-            return redirect("/admin/players")
-        ng = int(p.get("gold",0)) + gold
-        ns = int(p.get("silver",0)) + silver
-        nr = int(p.get("rubin", p.get("rubies",0))) + rubin
-        upd = {"gold": ng, "silver": ns, "rubin": nr, "rubies": nr}
-        if lvl and lvl.strip()!="":
-            upd["lvl"] = int(lvl)
-        supabase.table("players").update(upd).eq("uid", uid).execute()
-    except Exception as e:
-        print("admin give error", e)
-    return redirect("/admin/players")
+if __name__=="__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
