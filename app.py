@@ -24,9 +24,16 @@ def init_db():
     try:
         conn=get_db(); cur=conn.cursor()
         if DATABASE_URL:
-            cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)")
+            cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS wins INT DEFAULT 1")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS losses INT DEFAULT 0")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS exp INT DEFAULT 0")
         else:
-            cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20)")
+            cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
+            try: cur.execute("ALTER TABLE players ADD COLUMN wins INT DEFAULT 1")
+            except: pass
+            try: cur.execute("ALTER TABLE players ADD COLUMN losses INT DEFAULT 0")
+            except: pass
         conn.commit(); cur.close(); conn.close()
     except Exception as e:
         print(f"DB INIT ERROR: {e}")
@@ -76,6 +83,22 @@ def add_reward(uid, add_g, add_s, add_r):
         conn.commit(); cur.close(); conn.close()
         convert_silver(uid); return True
     except: return False
+
+def add_win(uid):
+    try:
+        conn=get_db(); cur=conn.cursor()
+        if DATABASE_URL: cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1 WHERE id=%s",(uid,))
+        else: cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1 WHERE id=?",(uid,))
+        conn.commit(); cur.close(); conn.close()
+    except: pass
+
+def add_loss(uid):
+    try:
+        conn=get_db(); cur=conn.cursor()
+        if DATABASE_URL: cur.execute("UPDATE players SET losses=COALESCE(losses,0)+1 WHERE id=%s",(uid,))
+        else: cur.execute("UPDATE players SET losses=COALESCE(losses,0)+1 WHERE id=?",(uid,))
+        conn.commit(); cur.close(); conn.close()
+    except: pass
 
 BASE_CSS = """
 <style>
@@ -202,14 +225,22 @@ def fight_battle():
     if "enemy_hp" not in session: return redirect("/promysel")
     if request.method=="POST":
         m=request.form.get("m")
-        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
+                if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7); session["enemy_hp"]-=dmg; session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
             if session["enemy_hp"]<=0:
                 if not session.get("rewarded"):
                     ok=add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
-                    if ok: session["rewarded"]=True; session["log"]=f"<b style='color:green'>ПОБЕДА! +{session['reward_g']}🪙 +{session['reward_s']}⚪ +{session['reward_r']}💎</b><br>"+session["log"]
+                    if ok: 
+                        session["rewarded"]=True
+                        add_win(session["uid"])
+                        session["log"]=f"<b style='color:green'>ПОБЕДА! +{session['reward_g']}🪙 +{session['reward_s']}⚪ +{session['reward_r']}💎</b><br>"+session["log"]
             else:
                 ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1]); session["my_hp"]-=ed; session["log"]=f"{session['enemy_name']} бьет {ed}<br>"+session["log"]
+                if session["my_hp"]<=0:
+                    if not session.get("rewarded"):
+                        add_loss(session["uid"])
+                        session["rewarded"]=True
+                        session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
         elif m=="run": return redirect("/promysel")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
@@ -240,12 +271,16 @@ def quests(): return render_page('<div class="wrap" style="padding:20px"><h2>�
 @app.route("/online")
 def online(): return render_page('<div class="wrap" style="padding:20px"><h2>🟢 Онлайн скоро</h2><a href="/game" class="btn-orange">← На карту</a></div>', True)
 @app.route("/hero")
+@app.route("/hero")
 def hero_page():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
     lvl = max(1, l)
-    exp = p.get("exp",0) if isinstance(p, dict) or hasattr(p,'get') else 0
-    exp = int(exp or 0)
+    try:
+        wins = int(p.get("wins",1) if isinstance(p, dict) or hasattr(p,'get') else p["wins"])
+        losses = int(p.get("losses",0) if isinstance(p, dict) or hasattr(p,'get') else p["losses"])
+    except: wins, losses = 1, 0
+    exp = int(p.get("exp",0) if isinstance(p, dict) or hasattr(p,'get') else 0)
     exp_need = 100 * lvl
     add = lvl - 1
     life = 15 + add * 10
@@ -269,7 +304,7 @@ def hero_page():
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
                 <div style="display:flex;flex-direction:column;gap:12px">
                     <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;">🏅 ПОБЕДЫ ИГРОКОВ 0</div>
-                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;">⚔️ ПОБЕДЫ / ПОРАЖЕНИЯ 1/0</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;font-size:18px;line-height:1.1;">⚔️ ПОБЕДЫ / ПОРАЖЕНИЯ<br><span style="font-size:24px">{wins}/{losses}</span></div>
                 </div>
                 <div style="display:flex;flex-direction:column;gap:8px">
                     <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">❤️ ЖИЗНЬ {life}</div>
