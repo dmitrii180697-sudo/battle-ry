@@ -296,10 +296,18 @@ def online(): return render_page('<div class="wrap" style="padding:20px"><h2>�
 def hero_page():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    lvl = max(1, l)
+    # --- АВТО-АДМИН СРАЗУ ---
     try:
-        wins = int(p.get("wins",1) if isinstance(p, dict) or hasattr(p,'get') else p["wins"])
-        losses = int(p.get("losses",0) if isinstance(p, dict) or hasattr(p,'get') else p["losses"])
+        nick = p.get("nickname", p.get("name","")) if isinstance(p, dict) or hasattr(p,'get') else ""
+        if nick.lower() == "admin":
+            session["is_admin"] = True
+    except:
+        pass
+    # --- КОНЕЦ АВТО-АДМИН ---
+    lvl = max(1, 1)
+    try:
+        wins = int(p.get("wins",1) if isinstance(p, dict) or hasattr(p,'get') else 1)
+        losses = int(p.get("losses",0) if isinstance(p, dict) or hasattr(p,'get') else 0)
     except: wins, losses = 1, 0
     exp = int(p.get("exp",0) if isinstance(p, dict) or hasattr(p,'get') else 0)
     exp_need = 100 * lvl
@@ -313,9 +321,10 @@ def hero_page():
     # КНОПКА АДМИНКИ - видит только админ
     admin_block = ""
     if session.get("is_admin"):
-        admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a><br><a href="/admin/logout" style="color:#ffcccc;font-size:12px;text-decoration:none">выйти</a></div>'
+        admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center;margin:10px"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a></div>'
     html = f"""
     <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
+        {admin_block}
         <div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center">
             <div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold">
                 <span>⭐ {lvl}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span>
