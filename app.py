@@ -243,8 +243,48 @@ def online(): return render_page('<div class="wrap" style="padding:20px"><h2>�
 def hero_page():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    return render_page(f'<div class="wrap" style="padding:20px"><h2>👤 Персонаж</h2><p>Уровень: {l}<br>HP: {h}<br>Рубины: {r}<br>Золото: {g}<br>Серебро: {s}</p><a href="/game" class="btn-orange">← На карту</a></div>', True)
-
+    lvl = max(1, l)
+    exp = p.get("exp",0) if isinstance(p, dict) or hasattr(p,'get') else 0
+    exp = int(exp or 0)
+    exp_need = 100 * lvl
+    add = lvl - 1
+    life = 15 + add * 10
+    sila = 2 + add
+    metkost = 9 + add
+    zashita = 0 + add
+    lovkost = 4 + add
+    shield = 0 + add
+    html = f"""
+    <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
+        <div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center">
+            <div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold">
+                <span>⭐ {lvl}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span>
+            </div>
+        </div>
+        <div style="padding:12px;background:#3b2314;min-height:calc(100vh - 50px)">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+                <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px 10px;font-weight:bold;color:#3d2817;">🌟 ОПЫТ {exp}/{exp_need}</div>
+                <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px 10px;font-weight:bold;color:#3d2817;">🏆 СЛАВА 0/100</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;">🏅 ПОБЕДЫ ИГРОКОВ 0</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:18px 14px;font-weight:bold;color:#3d2817;">⚔️ ПОБЕДЫ / ПОРАЖЕНИЯ 1/0</div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">❤️ ЖИЗНЬ {life}</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">🗡️ СИЛА {sila}</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">🎯 МЕТКОСТЬ {metkost}</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">🛡️ ЗАЩИТА {zashita}</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">➡️ ЛОВКОСТЬ {lovkost}</div>
+                    <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:10px;padding:10px 12px;font-weight:bold;color:#3d2817;">🛡️ ПРОЧНОСТЬ ЩИТА {shield}</div>
+                </div>
+            </div>
+            <a href="/game" style="display:block;margin-top:20px;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">← На карту</a>
+        </div>
+    </div>
+    """
+    return render_page(html, True)
 @app.route("/logout")
 def logout(): session.clear(); return redirect("/")
 
