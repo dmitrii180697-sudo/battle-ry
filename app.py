@@ -319,8 +319,13 @@ def hero_page():
     lovkost = 4 + add
     shield = 0 + add
     # КНОПКА АДМИНКИ - видит только админ
-    admin_block = ""
-    if session.get("is_admin"):
+        admin_block = ""
+    try:
+        nick_tmp = p.get("nickname","").lower() if isinstance(p, dict) else ""
+    except:
+        nick_tmp = ""
+    if nick_tmp == "admin" or session.get("is_admin"):
+        session["is_admin"] = True
         admin_block = '<div style="background:#ff0000;border:2px solid gold;border-radius:10px;padding:12px;text-align:center;margin:10px"><a href="/admin" style="color:white;font-weight:bold;text-decoration:none;font-size:18px">👑 АДМИНКА</a></div>'
     html = f"""
     <div class="wrap" style="background:#2b1a0e;min-height:100vh;padding:0">
