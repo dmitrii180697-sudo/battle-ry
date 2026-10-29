@@ -221,11 +221,13 @@ def fight(monster):
 
 @app.route("/fight_battle", methods=["GET","POST"])
 def fight_battle():
-    if "uid" not in session: return redirect("/")
-    if "enemy_hp" not in session: return redirect("/promysel")
+    if "uid" not in session:
+        return redirect("/")
+    if "enemy_hp" not in session:
+        return redirect("/promysel")
     if request.method=="POST":
         m=request.form.get("m")
-                        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
+        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7)
             session["enemy_hp"]-=dmg
             session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
@@ -247,17 +249,28 @@ def fight_battle():
                         session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
         elif m=="run":
             return redirect("/promysel")
-                        session["rewarded"]=True
-                        session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
-        elif m=="run": return redirect("/promysel")
-    p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    enemy_hp=max(0,session["enemy_hp"]); enemy_max=session["enemy_max"]; my_hp=max(0,session["my_hp"]); perc=int(enemy_hp*100/enemy_max) if enemy_max else 0
-    body = top + f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{session["enemy_name"]} - {enemy_hp}/{enemy_max}</h3><div style="background:#3d2817;height:18px;border-radius:10px;overflow:hidden"><div style="width:{perc}%;height:100%;background:red"></div></div><div style="text-align:center">Ты: {my_hp}/20</div><div style="background:#fff8dc;border:1px dashed #5a3e22;padding:8px;height:110px;overflow:auto;margin:10px 0">{session["log"]}</div>'
-    if enemy_hp>0 and my_hp>0: body+='<form method="post" style="display:flex;gap:8px"><button name="m" value="hit" class="btn-orange" style="flex:1">🗡️ Ударить</button><button name="m" value="run" class="btn-orange" style="flex:1;background:#bcaaa4">Сбежать</button></form>'
-    else: body+='<a href="/promysel" class="btn-orange">← К монстрам</a><a href="/game" class="btn-orange" style="background:#d2b87e">На карту</a>'
-    body+='</div>'
-    return render_page(body, show_menu=False)
+    eh=max(0, session["enemy_hp"])
+    mh=max(0, session["my_hp"])
+    ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
+    mhp=int(mh*100/20) if mh else 0
+    html=f"""
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh">
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
+            <div style="font-weight:bold;margin-bottom:6px">{session['enemy_name']} HP: {eh}/{session['enemy_max']}</div>
+            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px"></div></div>
+        </div>
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
+            <div style="font-weight:bold;margin-bottom:6px">Ты HP: {mh}/20</div>
+            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px"></div></div>
+        </div>
+        <div style="background:#000;color:#0f0;padding:8px;border-radius:8px;height:120px;overflow:auto;margin-bottom:10px;font-size:13px">{session['log']}</div>
+        <form method="post" style="display:flex;gap:8px">
+            <button name="m" value="hit" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР</button>
+            <button name="m" value="run" style="flex:1;background:#ccc;border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🏃 БЕГ</button>
+        </form>
+    </div>
+    """
+    return render_page(html, True)
 
 @app.route("/pvp")
 def pvp():
