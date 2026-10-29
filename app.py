@@ -319,7 +319,7 @@ def hero_page():
     lovkost = 4 + add
     shield = 0 + add
     # КНОПКА АДМИНКИ - видит только админ
-        admin_block = ""
+    admin_block = ""
     try:
         nick_tmp = p.get("nickname","").lower() if isinstance(p, dict) else ""
     except:
