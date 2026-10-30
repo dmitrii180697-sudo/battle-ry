@@ -22,8 +22,8 @@ MONSTERS_CFG = {
     },
     "beast": {
         "name": "Дух зверя",
-        "img": "beast_spirit.png",
-        "hp": 35,
+        "img": "spirit_wolf_left.png",
+        "hp": 1000,
         "dmg": (4,7),
         "gold": 5, "silver": 20, "rubin": 1
     }
