@@ -1,4 +1,4 @@
-Аimport os, random
+import os, random
 from flask import Flask, request, redirect, session, render_template_string, send_from_directory
 import psycopg2
 from psycopg2.extras import RealDictCursor
