@@ -1,28 +1,67 @@
-    html=f"""
-    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;position:relative">
-        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
-            <div style="font-weight:bold;margin-bottom:6px">{session['enemy_name']} HP: {eh}/{session['enemy_max']}</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px;transition: width 0.5s"></div></div>
-        </div>
-        
-        <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px;position:relative;overflow:hidden">
-            <img id="hero-img" src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black);transition:0.15s">
-            <div style="position:relative">
-                <img id="enemy-img" src="/static/{enemy_img}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
-                <div id="dmg-float">-5</div>
-            </div>
-        </div>
+// === BATTLE ANIMATION A ===
+let isAnimating = false;
 
-        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
-            <div style="font-weight:bold;margin-bottom:6px">Ты HP: {mh}/20</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition: width 0.5s"></div></div>
-        </div>
-        <div style="background:#000;color:#0f0;padding:8px;border-radius:8px;height:120px;overflow:auto;margin-bottom:10px;font-size:13px">{session['log']}</div>
+function playHitAnimation(callback) {
+    if(isAnimating) return;
+    isAnimating = true;
+    
+    const hero = document.getElementById('hero-img');
+    const enemy = document.getElementById('enemy-img');
+    const dmgText = document.getElementById('dmg-float');
+    
+    // 1. Замах
+    hero.src = '/static/anim_raise.png';
+    hero.style.transform = 'translateX(-20px) scale(1.1)';
+    hero.style.transition = '0.15s';
+    
+    setTimeout(() => {
+        // 2. Удар
+        hero.src = '/static/anim_hit.png';
+        hero.style.transform = 'translateX(40px) scale(1.15)';
         
-        <form id="hit-form" method="post" style="display:flex;gap:8px">
-            <button type="button" onclick="doHit()" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР ДУБИНОЙ</button>
-            <button name="m" value="run" style="flex:1;background:#ccc;border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🏃 БЕГ</button>
-        </form>
-    </div>
-    <script src="/static/game.js"></script>
-    """
+        // Тряска врага + цифра
+        enemy.style.animation = 'shake 0.3s';
+        let dmg = Math.floor(Math.random()*5)+3; // для вида, реальный урон с сервера
+        dmgText.innerText = '-' + dmg;
+        dmgText.style.opacity = '1';
+        dmgText.style.transform = 'translateY(-60px)';
+        
+        setTimeout(() => {
+            // 3. Возврат
+            hero.src = '/static/barbarian_game_size.png';
+            hero.style.transform = 'translateX(0) scale(1)';
+            dmgText.style.opacity = '0';
+            dmgText.style.transform = 'translateY(0)';
+            enemy.style.animation = '';
+            isAnimating = false;
+            if(callback) callback();
+        }, 300);
+    }, 150);
+}
+
+function doHit() {
+    playHitAnimation(() => {
+        // После анимации отправляем на сервер
+        document.getElementById('hit-form').submit();
+    });
+}
+
+// CSS для тряски
+const style = document.createElement('style');
+style.innerHTML = `
+@keyframes shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-8px) rotate(-2deg); }
+  50% { transform: translateX(8px) rotate(2deg); }
+  75% { transform: translateX(-5px); }
+  100% { transform: translateX(0); }
+}
+#dmg-float {
+  position:absolute; top:50%; left:60%; 
+  font-size:32px; font-weight:bold; color:#ff2222;
+  text-shadow: 2px 2px 0 #000;
+  opacity:0; transition: all 0.4s ease-out;
+  pointer-events:none;
+}
+`;
+document.head.appendChild(style);
