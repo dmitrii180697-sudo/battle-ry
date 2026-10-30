@@ -296,7 +296,7 @@ def fight_battle():
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
     enemy_img = session.get("enemy_img","ancient_warrior.png")
-       eh=max(0, session["enemy_hp"])
+    eh=max(0, session["enemy_hp"])
     mh=max(0, session["my_hp"])
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
