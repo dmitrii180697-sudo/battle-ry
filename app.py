@@ -264,85 +264,88 @@ def fight(monster):
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET","POST"])
+@app.route("/fight_battle", methods=["GET","POST"])
 def fight_battle():
     if "uid" not in session:
         return redirect("/")
     if "enemy_hp" not in session:
         return redirect("/promysel")
-    # счетчики боя
+
     if "hit_count" not in session:
         session["hit_count"]=0
-    if "super_used" not in session:
-        session["super_used"]=False
 
     if request.method=="POST":
         m=request.form.get("m")
         if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7)
             session["enemy_hp"]-=dmg
-            session["hit_count"]+=1
-            session["last_dmg"]=dmg
-            session["last_hit"]="my"
-            session["is_super"]=False
-            if session["enemy_hp"]<=0:
-                if not session.get("rewarded"):
-                    add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
-                    session["rewarded"]=True
-                    add_win(session["uid"])
-            else:
-                ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
-                session["my_hp"]-=ed
-                session["last_edmg"]=ed
-                if session["my_hp"]<=0 and not session.get("rewarded"):
-                    add_loss(session["uid"])
-                    session["rewarded"]=True
-        elif m=="super" and session["my_hp"]>0 and session["enemy_hp"]>0 and not session.get("super_used") and session.get("hit_count",0)>=5:
-            dmg=random.randint(3,7)*5
+            session["hit_count"]=session.get("hit_count",0)+1
+        if m=="super" and session.get("hit_count",0)>=5:
+            dmg=random.randint(10,18)
             session["enemy_hp"]-=dmg
-            session["super_used"]=True
-            session["last_dmg"]=dmg
-            session["last_hit"]="my"
-            session["is_super"]=True
-            if session["enemy_hp"]<=0:
-                if not session.get("rewarded"):
-                    add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
-                    session["rewarded"]=True
-                    add_win(session["uid"])
-            else:
-                ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
-                session["my_hp"]-=ed
-                session["last_edmg"]=ed
-                if session["my_hp"]<=0 and not session.get("rewarded"):
-                    add_loss(session["uid"])
-                    session["rewarded"]=True
-        elif m=="run":
+            session["hit_count"]=0
+        if m=="run":
             return redirect("/promysel")
+        if session["enemy_hp"]>0 and session["my_hp"]>0 and m in ["hit","super"]:
+            try:
+                emin,emax=session.get("enemy_dmg",[2,5])
+                ed=random.randint(int(emin),int(emax))
+            except:
+                ed=random.randint(2,5)
+            session["my_hp"]-=ed
+        if session["my_hp"]<=0 and not session.get("rewarded"):
+            add_loss(session["uid"])
+            session["rewarded"]=True
+        if session["enemy_hp"]<=0 and not session.get("rewarded"):
+            add_win(session["uid"])
+            session["rewarded"]=True
 
-        eh=max(0, session["enemy_hp"])
-    mh=max(0, session["my_hp"])
-    ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
-    mhp=int(mh*100/20) if mh else 0
-    enemy_img = session.get("enemy_img","ancient_warrior.png")
-    camp_bg = "camp.jpg"
-    hit_count = session.get("hit_count",0)
-    super_ready = hit_count >= 5
-    enemy_name = session.get("enemy","Древний воин")
+    cur_enemy_hp=max(0, session.get("enemy_hp",0))
+    cur_my_hp=max(0, session.get("my_hp",0))
+    enemy_max_hp=session.get("enemy_max",20)
+    enemy_per=int(cur_enemy_hp*100/enemy_max_hp) if enemy_max_hp else 0
+    my_per=int(cur_my_hp*100/20) if cur_my_hp else 0
+    enemy_img=session.get("enemy_img","ancient_warrior.png")
+    enemy_name=session.get("enemy","Древний воин")
+    hit_cnt=session.get("hit_count",0)
+    is_super=hit_cnt>=5
+    camp_bg="camp.jpg"
+    super_label="x5 ГОТОВ!" if is_super else f"{hit_cnt}/5"
+    opac=1 if is_super else 0.4
 
-    if eh<=0 or mh<=0:
-        is_win=eh<=0
+    if cur_enemy_hp<=0 or cur_my_hp<=0:
+        is_win=cur_enemy_hp<=0
         title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
-        color="#00ff66" if is_win else "#ff3333"
-        reward=f"+{session['reward_g']} 🪙 +{session['reward_s']} 🧪 +{session['reward_r']} ❤️" if is_win else ""
-        html=f"""
-        <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;display:flex;align-items:center;justify-content:center">
-          <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;max-width:380px">
-            <h1 style="color:{color};margin:0 0 10px">{title}</h1>
-            <p style="font-weight:900">{reward}</p>
-            <a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900;margin-top:10px">В ЛАГЕРЬ</a>
-          </div>
-        </div>
-        """
+        col="#00ff66" if is_win else "#ff3333"
+        html=f'<div style="min-height:100vh;background:#1a0e0a;display:flex;align-items:center;justify-content:center"><div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center"><h1 style="color:{col}">{title}</h1><a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900">В ЛАГЕРЬ</a></div></div>'
         return render_template_string(html)
+
+    html=f'''
+    <div style="max-width:420px;margin:0 auto;padding:10px">
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span>{cur_enemy_hp}/{enemy_max_hp}</span></div>
+        <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{enemy_per}%;height:100%;background:#ff3b30"></div></div>
+      </div>
+
+      <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative">
+        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.25);border-radius:13px"></div>
+        <div style="flex:1;text-align:center;z-index:2"><img src="/static/barbarian.png" style="height:210px;object-fit:contain;filter:drop-shadow(0 4px 12px black)"></div>
+        <div style="flex:1;text-align:center;z-index:2"><img src="/static/{enemy_img}" style="height:210px;object-fit:contain;filter:drop-shadow(0 4px 12px black)"></div>
+      </div>
+
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span>{cur_my_hp}/20</span></div>
+        <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{my_per}%;height:100%;background:#2ecc40"></div></div>
+      </div>
+
+      <form method="post" style="display:flex;gap:8px">
+        <button name="m" value="hit" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:14px;padding:8px"><img src="/static/sword_normal.png" style="width:60px"><div style="color:#ffb84d;font-weight:900;font-size:11px">УДАР [{hit_cnt}]</div></button>
+        <button name="m" value="super" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:14px;padding:8px;opacity:{opac}"><img src="/static/sword_super.png" style="width:60px"><div style="color:#ff0;font-weight:900;font-size:11px">{super_label}</div></button>
+        <button name="m" value="run" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:8px;font-weight:900">БЕГ</button>
+      </form>
+    </div>
+    '''
+    return render_template_string(html)
 
     # === БОЙ - ФОН ЛАГЕРЯ БЕЗ ЧЕРНЫХ РАМОК ===
     html=f"""
