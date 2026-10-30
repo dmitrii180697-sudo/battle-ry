@@ -363,11 +363,21 @@ def fight_battle():
             <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px"><span>Ты</span><span>{mh}/20</span></div>
             <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition:width 0.5s"></div></div>
         </div>
-        <form id="hit-form" method="post" style="display:flex;flex-direction:column;gap:8px">
-            <input type="hidden" id="action-input" name="m" value="hit">
-            <button type="button" onclick="doHit(false)" style="width:100%;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:900;font-size:16px">🪓 УДАР ДУБИНОЙ [{hit_count}]</button>
-            <button type="button" id="super-btn" onclick="doHit(true)" {"disabled" if not super_ready else ""} style="width:100%;background:{'linear-gradient(#ff4444,#ffcc00)' if super_ready else '#888'};border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:900;font-size:16px;opacity:{'1' if super_ready else '0.5'};color:#000">🔥 {super_text}</button>
-        </form>
+        <form id="hit-form" method="post" style="display:flex;gap:10px;justify-content:center">
+    <input type="hidden" id="action-input" name="m" value="hit">
+    
+    <!-- КНОПКА ОБЫЧНЫЙ МЕЧ -->
+    <button type="button" onclick="doHit(false)" style="flex:1;background:#1a0e0a;border:3px solid #ff8c00;border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;position:relative">
+        <img src="/static/sword_normal.png" style="width:80px;height:80px;object-fit:contain">
+        <span style="color:#ffb84d;font-weight:900;font-size:12px;margin-top:4px">УДАР [{hit_count}]</span>
+    </button>
+    
+    <!-- КНОПКА СУПЕР МЕЧ x5 -->
+    <button type="button" id="super-btn" onclick="doHit(true)" {"disabled" if not super_ready else ""} style="flex:1;background:{'#1a0e0a' if super_ready else '#222'};border:3px solid {'#ffcc00' if super_ready else '#555'};border-radius:14px;padding:6px;display:flex;flex-direction:column;align-items:center;opacity:{'1' if super_ready else '0.4'};box-shadow:{'0 0 15px #ff0' if super_ready else 'none'}">
+        <img src="/static/sword_super.png" style="width:80px;height:80px;object-fit:contain;filter:{'none' if super_ready else 'grayscale(1)'}">
+        <span style="color:{'#ff0' if super_ready else '#777'};font-weight:900;font-size:12px;margin-top:4px">{'x5 ГОТОВ!' if super_ready else f'({hit_count}/5)'}</span>
+    </button>
+</form>
     </div>
     <script>const lastDmg={session.get('last_dmg',5)}; const isSuper={str(session.get('is_super',False)).lower()};</script>
     <script src="/static/game.js"></script>
