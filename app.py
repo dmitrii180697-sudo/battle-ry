@@ -318,27 +318,64 @@ def fight_battle():
         elif m=="run":
             return redirect("/promysel")
 
-    eh=max(0, session["enemy_hp"])
+        eh=max(0, session["enemy_hp"])
     mh=max(0, session["my_hp"])
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
     enemy_img = session.get("enemy_img","ancient_warrior.png")
-    
+    camp_bg = "camp.jpg"
+    hit_count = session.get("hit_count",0)
+    super_ready = hit_count >= 5
+    enemy_name = session.get("enemy","Древний воин")
+
     if eh<=0 or mh<=0:
         is_win=eh<=0
         title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
         color="#00ff66" if is_win else "#ff3333"
-        reward=f"+{session['reward_g']} 🪙 +{session['reward_s']} ⚪ +{session['reward_r']} 💎" if is_win else "Ты пал..."
+        reward=f"+{session['reward_g']} 🪙 +{session['reward_s']} 🧪 +{session['reward_r']} ❤️" if is_win else ""
         html=f"""
         <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;display:flex;align-items:center;justify-content:center">
-            <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;width:100%;max-width:320px">
-                <div style="font-size:42px">{"🏆" if is_win else "💀"}</div>
-                <div style="font-size:28px;font-weight:900;color:{color}">{title}</div>
-                <div style="margin:12px 0">{reward}</div>
-                <a href="/promysel" style="display:block;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:14px;font-weight:bold;text-decoration:none;color:#000">В ПРОМЫСЕЛ</a>
-            </div>
-        </div>"""
-        return render_page(html, False)
+          <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;max-width:380px">
+            <h1 style="color:{color};margin:0 0 10px">{title}</h1>
+            <p style="font-weight:900">{reward}</p>
+            <a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900;margin-top:10px">В ЛАГЕРЬ</a>
+          </div>
+        </div>
+        """
+        return render_template_string(html)
+
+    # === БОЙ - ФОН ЛАГЕРЯ БЕЗ ЧЕРНЫХ РАМОК ===
+    html=f"""
+    <div style="max-width:420px;margin:0 auto;padding:10px;font-family:sans-serif">
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:14px"><span>{enemy_name}</span><span>{eh}/{session['enemy_max']}</span></div>
+        <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:2px"><div style="width:{ehp}%;height:100%;background:#ff3b30"></div></div>
+      </div>
+
+      <div style="background:url('/static/{camp_bg}') center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 10px 10px;position:relative;overflow:hidden">
+        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.25)"></div>
+        <div style="flex:1;text-align:center;z-index:2;background:transparent"><img src="/static/barbarian.png" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
+        <div style="flex:1;text-align:center;z-index:2;background:transparent"><img src="/static/{enemy_img}" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
+      </div>
+
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span>{mh}/20</span></div>
+        <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:2px"><div style="width:{mhp}%;height:100%;background:#2ecc40"></div></div>
+      </div>
+
+      <form method="post" style="display:flex;gap:8px">
+        <input type="hidden" name="m" id="act">
+        <button type="button" onclick="document.getElementById('act').value='hit';this.form.submit()" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:14px;padding:8px;display:flex;flex-direction:column;align-items:center">
+          <img src="/static/sword_normal.png" style="width:70px;height:70px;object-fit:contain"><span style="color:#ffb84d;font-weight:900;font-size:11px;margin-top:4px">УДАР [{hit_count}]</span>
+        </button>
+        <button type="button" onclick="if({str(super_ready).lower()}){{document.getElementById('act').value='super';this.form.submit()}}" {'disabled' if not super_ready else ''} style="flex:1;background:#2b1a0e;border:3px solid {'#ffcc00' if super_ready else '#555'};border-radius:14px;padding:8px;display:flex;flex-direction:column;align-items:center;opacity:{'1' if super_ready else '0.4'}">
+          <img src="/static/sword_super.png" style="width:70px;height:70px;object-fit:contain"><span style="color:{'#ff0' if super_ready else '#777'};font-weight:900;font-size:11px">{'x5 ГОТОВ!' if super_ready else f'{hit_count}/5'}</span>
+        </button>
+        <button type="button" onclick="document.getElementById('act').value='run';this.form.submit()" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:8px;font-weight:900">БЕГ</button>
+      </form>
+    </div>
+    """
+    return render_template_string(html)
 
     hit_count=session.get("hit_count",0)
     super_used=session.get("super_used",False)
