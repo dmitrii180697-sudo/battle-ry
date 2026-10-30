@@ -258,6 +258,8 @@ def fight(monster):
     session["reward_r"]=cfg["rubin"]
     session["my_hp"]=20
     session["rewarded"]=False
+    session["hit_count"]=0        
+    session["super_used"]=False
     session["log"]=f"Встретил {cfg['name']}!"
     return redirect("/fight_battle")
 
@@ -267,55 +269,110 @@ def fight_battle():
         return redirect("/")
     if "enemy_hp" not in session:
         return redirect("/promysel")
+    # счетчики боя
+    if "hit_count" not in session:
+        session["hit_count"]=0
+    if "super_used" not in session:
+        session["super_used"]=False
+
     if request.method=="POST":
         m=request.form.get("m")
         if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7)
             session["enemy_hp"]-=dmg
+            session["hit_count"]+=1
             session["last_dmg"]=dmg
             session["last_hit"]="my"
+            session["is_super"]=False
             if session["enemy_hp"]<=0:
                 if not session.get("rewarded"):
-                    ok=add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
-                    if ok:
-                        session["rewarded"]=True
-                        add_win(session["uid"])
+                    add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
+                    session["rewarded"]=True
+                    add_win(session["uid"])
             else:
                 ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
                 session["my_hp"]-=ed
                 session["last_edmg"]=ed
-                session["last_hit"]="enemy"
-                if session["my_hp"]<=0:
-                    if not session.get("rewarded"):
-                        add_loss(session["uid"])
-                        session["rewarded"]=True
+                if session["my_hp"]<=0 and not session.get("rewarded"):
+                    add_loss(session["uid"])
+                    session["rewarded"]=True
+        elif m=="super" and session["my_hp"]>0 and session["enemy_hp"]>0 and not session.get("super_used") and session.get("hit_count",0)>=5:
+            dmg=random.randint(3,7)*5
+            session["enemy_hp"]-=dmg
+            session["super_used"]=True
+            session["last_dmg"]=dmg
+            session["last_hit"]="my"
+            session["is_super"]=True
+            if session["enemy_hp"]<=0:
+                if not session.get("rewarded"):
+                    add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
+                    session["rewarded"]=True
+                    add_win(session["uid"])
+            else:
+                ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
+                session["my_hp"]-=ed
+                session["last_edmg"]=ed
+                if session["my_hp"]<=0 and not session.get("rewarded"):
+                    add_loss(session["uid"])
+                    session["rewarded"]=True
         elif m=="run":
             return redirect("/promysel")
-            
+
     eh=max(0, session["enemy_hp"])
     mh=max(0, session["my_hp"])
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
     enemy_img = session.get("enemy_img","ancient_warrior.png")
-
-    # === ЭКРАН ОКОНЧАНИЯ БОЯ ===
+    
     if eh<=0 or mh<=0:
-        is_win = eh<=0
-        title = "ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
-        color = "#00ff66" if is_win else "#ff3333"
-        reward_text = f"+{session['reward_g']} 🪙 +{session['reward_s']} ⚪ +{session['reward_r']} 💎" if is_win else "Ты пал в бою..."
+        is_win=eh<=0
+        title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
+        color="#00ff66" if is_win else "#ff3333"
+        reward=f"+{session['reward_g']} 🪙 +{session['reward_s']} ⚪ +{session['reward_r']} 💎" if is_win else "Ты пал..."
         html=f"""
         <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;display:flex;align-items:center;justify-content:center">
-            <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;width:100%;max-width:320px;box-shadow:0 0 20px rgba(0,0,0,0.8)">
-                <div style="font-size:42px;margin-bottom:10px">{"🏆" if is_win else "💀"}</div>
-                <div style="font-size:28px;font-weight:900;color:{color};text-shadow:1px 1px 0 #000;margin-bottom:10px">{title}</div>
-                <div style="font-size:16px;margin-bottom:20px">{session['enemy_name']} повержен! <br><b>{reward_text}</b></div>
-                <a href="/promysel" style="display:block;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:14px;font-weight:bold;text-decoration:none;color:#000;text-align:center">⚔️ В ПРОМЫСЕЛ</a>
-                <a href="/" style="display:block;background:#ddd;border:2px solid #5a3e22;border-radius:10px;padding:10px;margin-top:8px;font-weight:bold;text-decoration:none;color:#000;text-align:center">🏠 В ГОРОД</a>
+            <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;width:100%;max-width:320px">
+                <div style="font-size:42px">{"🏆" if is_win else "💀"}</div>
+                <div style="font-size:28px;font-weight:900;color:{color}">{title}</div>
+                <div style="margin:12px 0">{reward}</div>
+                <a href="/promysel" style="display:block;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:14px;font-weight:bold;text-decoration:none;color:#000">В ПРОМЫСЕЛ</a>
+            </div>
+        </div>"""
+        return render_page(html, False)
+
+    hit_count=session.get("hit_count",0)
+    super_used=session.get("super_used",False)
+    super_ready=hit_count>=5 and not super_used
+    # прогресс до суперудара
+    super_text = f"СУПЕР УДАР x5 (ГОТОВ!)" if super_ready else f"СУПЕР УДАР ({hit_count}/5)"
+    
+    html=f"""
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;">
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:10px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px"><span>{session['enemy_name']}</span><span>{eh}/{session['enemy_max']}</span></div>
+            <div style="background:#300;height:12px;border-radius:6px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:6px;transition:width 0.5s"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:end;background:radial-gradient(#3a2412,#1a0e0a);border:2px solid #5a3e22;border-radius:12px;padding:10px;margin-bottom:12px;height:280px;position:relative;overflow:hidden">
+            <img id="hero-img" src="/static/barbarian_game_size.png" style="height:240px;object-fit:contain;filter:drop-shadow(0 0 10px black)">
+            <div style="position:relative">
+                <img id="enemy-img" src="/static/{enemy_img}" style="height:240px;object-fit:contain;transform:scaleX(-1);filter:drop-shadow(0 0 10px black)">
+                <div id="dmg-float-enemy" class="dmg">-5</div>
             </div>
         </div>
-        """
-        return render_page(html, False)
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:10px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px"><span>Ты</span><span>{mh}/20</span></div>
+            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition:width 0.5s"></div></div>
+        </div>
+        <form id="hit-form" method="post" style="display:flex;flex-direction:column;gap:8px">
+            <input type="hidden" id="action-input" name="m" value="hit">
+            <button type="button" onclick="doHit(false)" style="width:100%;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:900;font-size:16px">🪓 УДАР ДУБИНОЙ [{hit_count}]</button>
+            <button type="button" id="super-btn" onclick="doHit(true)" {"disabled" if not super_ready else ""} style="width:100%;background:{'linear-gradient(#ff4444,#ffcc00)' if super_ready else '#888'};border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:900;font-size:16px;opacity:{'1' if super_ready else '0.5'};color:#000">🔥 {super_text}</button>
+        </form>
+    </div>
+    <script>const lastDmg={session.get('last_dmg',5)}; const isSuper={str(session.get('is_super',False)).lower()};</script>
+    <script src="/static/game.js"></script>
+    """
+    return render_page(html, False)
 
     # === ЭКРАН БОЯ - БЕЗ ЛОГА И БЕЗ МЕНЮ ===
     html=f"""
