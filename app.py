@@ -272,65 +272,87 @@ def fight_battle():
         if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7)
             session["enemy_hp"]-=dmg
-            session["log"]=f"Ты бьешь {dmg}<br>"+session["log"]
+            session["last_dmg"]=dmg
+            session["last_hit"]="my"
             if session["enemy_hp"]<=0:
                 if not session.get("rewarded"):
                     ok=add_reward(session["uid"], session["reward_g"], session["reward_s"], session["reward_r"])
                     if ok:
                         session["rewarded"]=True
                         add_win(session["uid"])
-                        session["log"]=f"<b style='color:green'>ПОБЕДА! +{session['reward_g']}🪙 +{session['reward_s']}⚪ +{session['reward_r']}💎</b><br>"+session["log"]
             else:
                 ed=random.randint(session["enemy_dmg"][0], session["enemy_dmg"][1])
                 session["my_hp"]-=ed
-                session["log"]=f"{session['enemy_name']} бьет {ed}<br>"+session["log"]
+                session["last_edmg"]=ed
+                session["last_hit"]="enemy"
                 if session["my_hp"]<=0:
                     if not session.get("rewarded"):
                         add_loss(session["uid"])
                         session["rewarded"]=True
-                        session["log"]=f"<b style='color:red'>ПОРАЖЕНИЕ!</b><br>"+session["log"]
         elif m=="run":
             return redirect("/promysel")
+            
     eh=max(0, session["enemy_hp"])
     mh=max(0, session["my_hp"])
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
     enemy_img = session.get("enemy_img","ancient_warrior.png")
-    eh=max(0, session["enemy_hp"])
-    mh=max(0, session["my_hp"])
-    ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
-    mhp=int(mh*100/20) if mh else 0
-    enemy_img = session.get("enemy_img","ancient_warrior.png")
+
+    # === ЭКРАН ОКОНЧАНИЯ БОЯ ===
+    if eh<=0 or mh<=0:
+        is_win = eh<=0
+        title = "ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
+        color = "#00ff66" if is_win else "#ff3333"
+        reward_text = f"+{session['reward_g']} 🪙 +{session['reward_s']} ⚪ +{session['reward_r']} 💎" if is_win else "Ты пал в бою..."
+        html=f"""
+        <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;display:flex;align-items:center;justify-content:center">
+            <div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center;width:100%;max-width:320px;box-shadow:0 0 20px rgba(0,0,0,0.8)">
+                <div style="font-size:42px;margin-bottom:10px">{"🏆" if is_win else "💀"}</div>
+                <div style="font-size:28px;font-weight:900;color:{color};text-shadow:1px 1px 0 #000;margin-bottom:10px">{title}</div>
+                <div style="font-size:16px;margin-bottom:20px">{session['enemy_name']} повержен! <br><b>{reward_text}</b></div>
+                <a href="/promysel" style="display:block;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:14px;font-weight:bold;text-decoration:none;color:#000;text-align:center">⚔️ В ПРОМЫСЕЛ</a>
+                <a href="/" style="display:block;background:#ddd;border:2px solid #5a3e22;border-radius:10px;padding:10px;margin-top:8px;font-weight:bold;text-decoration:none;color:#000;text-align:center">🏠 В ГОРОД</a>
+            </div>
+        </div>
+        """
+        return render_page(html, False)
+
+    # === ЭКРАН БОЯ - БЕЗ ЛОГА И БЕЗ МЕНЮ ===
     html=f"""
-    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;position:relative">
-        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
-            <div style="font-weight:bold;margin-bottom:6px">{session['enemy_name']} HP: {eh}/{session['enemy_max']}</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px;transition: width 0.5s"></div></div>
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;">
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:10px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:4px"><span>{session['enemy_name']}</span><span>{eh}/{session['enemy_max']}</span></div>
+            <div style="background:#300;height:12px;border-radius:6px;overflow:hidden"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:6px;transition: width 0.5s"></div></div>
         </div>
         
-        <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px;position:relative;overflow:hidden">
-            <img id="hero-img" src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black);transition:0.15s">
+        <div style="display:flex;justify-content:space-between;align-items:end;background:radial-gradient(#3a2412,#1a0e0a);border:2px solid #5a3e22;border-radius:12px;padding:10px;margin-bottom:12px;height:280px;position:relative;overflow:hidden">
+            <img id="hero-img" src="/static/barbarian_game_size.png" style="height:240px;object-fit:contain;filter:drop-shadow(0 0 10px black);transition:0.12s">
             <div style="position:relative">
-                <img id="enemy-img" src="/static/{enemy_img}" style="height:220px;object-fit:contain;transform:scaleX(-1);filter:drop-shadow(0 0 8px black)">
-                <div id="dmg-float">-5</div>
+                <img id="enemy-img" src="/static/{enemy_img}" style="height:240px;object-fit:contain;transform:scaleX(-1);filter:drop-shadow(0 0 10px black)">
+                <div id="dmg-float-enemy" class="dmg">-5</div>
+                <div id="dmg-float-hero" class="dmg" style="left:-60px;color:#4dff4d">-3</div>
             </div>
         </div>
 
-        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
-            <div style="font-weight:bold;margin-bottom:6px">Ты HP: {mh}/20</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition: width 0.5s"></div></div>
+        <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:10px;margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px;margin-bottom:4px"><span>Ты</span><span>{mh}/20</span></div>
+            <div style="background:#300;height:14px;border-radius:7px;overflow:hidden"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition: width 0.5s"></div></div>
         </div>
-        <div style="background:#000;color:#0f0;padding:8px;border-radius:8px;height:120px;overflow:auto;margin-bottom:10px;font-size:13px">{session['log']}</div>
         
         <form id="hit-form" method="post" style="display:flex;gap:8px">
             <input type="hidden" name="m" value="hit">
-            <button type="button" onclick="doHit()" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР ДУБИНОЙ</button>
-            <button name="m" value="run" style="flex:1;background:#ccc;border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🏃 БЕГ</button>
+            <button type="button" onclick="doHit()" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:900;font-size:16px;box-shadow:0 3px 0 #5a3e22">🗡️ УДАР ДУБИНОЙ</button>
+            <button name="m" value="run" formnovalidate formaction="/promysel" style="background:#ccc;border:2px solid #5a3e22;border-radius:10px;padding:16px;font-weight:bold">🏃</button>
         </form>
     </div>
+    <script>
+    const lastDmg = {session.get('last_dmg', 5)};
+    const lastEdmg = {session.get('last_edmg', 3)};
+    const lastHit = '{session.get('last_hit','')}';
+    </script>
     <script src="/static/game.js"></script>
     """
-    return render_page(html, True)
+    return render_page(html, False)
 
 @app.route("/pvp")
 def pvp():
