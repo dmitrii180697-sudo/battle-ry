@@ -1,4 +1,4 @@
-import os, random
+Аimport os, random
 from flask import Flask, request, redirect, session, render_template_string, send_from_directory
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -355,7 +355,7 @@ def fight_battle():
         <div style="display:flex;justify-content:space-between;align-items:end;background:radial-gradient(#3a2412,#1a0e0a);border:2px solid #5a3e22;border-radius:12px;padding:10px;margin-bottom:12px;height:280px;position:relative;overflow:hidden">
             <img id="hero-img" src="/static/barbarian_game_size.png" style="height:240px;object-fit:contain;filter:drop-shadow(0 0 10px black)">
             <div style="position:relative">
-                <img id="enemy-img" src="/static/{enemy_img}" style="height:240px;object-fit:contain;transform:scaleX(-1);filter:drop-shadow(0 0 10px black)">
+                <img id="enemy-img" src="/static/{enemy_img}" style="height:240px;object-fit:contain;;filter:drop-shadow(0 0 10px black)">
                 <div id="dmg-float-enemy" class="dmg">-5</div>
             </div>
         </div>
