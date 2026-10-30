@@ -334,9 +334,11 @@ def fight_battle():
         <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{enemy_per}%;height:100%;background:#ff3b30"></div></div>
       </div>
 
-      <div style="background:#d2b48c;border-radius:16px;border:3px solid #8b5a2b;height:260px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
-        <div style="flex:0 0 42%;text-align:center;z-index:2;background:transparent"><img src="/static/{HERO_IMG}" style="height:170px;max-width:100%;object-fit:contain;background:transparent !important;border:none !important">
-     <div style="flex:0 0 52%;text-align:center;z-index:2;background:transparent"><img src="/static/{enemy_img}" style="height:170px;max-width:100%;object-fit:contain;background:transparent !important;border:none !important">
+      <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative">
+        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.25);border-radius:13px"></div>
+        <div style="flex:1;text-align:center;z-index:2"><img src="/static/{HERO_IMG}" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
+        <div style="flex:1;text-align:center;z-index:2"><img src="/static/{enemy_img}" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
+        <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:5;color:#ff0;font-weight:900;font-size:32px;text-shadow:2px 2px 0 #000;display:{'block' if last_dmg else 'none'}">-{last_dmg}</div>
       </div>
 
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
