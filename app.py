@@ -311,7 +311,7 @@ def fight_battle():
         <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px;position:relative;overflow:hidden">
             <img id="hero-img" src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black);transition:0.15s">
             <div style="position:relative">
-                <img id="enemy-img" src="/static/{enemy_img}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
+                <img id="enemy-img" src="/static/{enemy_img}" style="height:220px;object-fit:contain;transform:scaleX(-1);filter:drop-shadow(0 0 8px black)">
                 <div id="dmg-float">-5</div>
             </div>
         </div>
