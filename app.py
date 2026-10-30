@@ -296,26 +296,39 @@ def fight_battle():
     ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
     mhp=int(mh*100/20) if mh else 0
     enemy_img = session.get("enemy_img","ancient_warrior.png")
+       eh=max(0, session["enemy_hp"])
+    mh=max(0, session["my_hp"])
+    ehp=int(eh*100/session["enemy_max"]) if session["enemy_max"] else 0
+    mhp=int(mh*100/20) if mh else 0
+    enemy_img = session.get("enemy_img","ancient_warrior.png")
     html=f"""
-    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh">
+    <div class="wrap" style="background:#1a0e0a;padding:12px;min-height:100vh;position:relative">
         <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
             <div style="font-weight:bold;margin-bottom:6px">{session['enemy_name']} HP: {eh}/{session['enemy_max']}</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px"></div></div>
+            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{ehp}%;height:100%;background:linear-gradient(#ff4d4d,#b30000);border-radius:7px;transition: width 0.5s"></div></div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px">
-            <img src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
-            <img src="/static/{enemy_img}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
+        
+        <div style="display:flex;justify-content:space-between;align-items:end;background:#2b1a0e;border-radius:12px;padding:10px;margin-bottom:10px;height:260px;position:relative;overflow:hidden">
+            <img id="hero-img" src="/static/{HERO_IMG}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black);transition:0.15s">
+            <div style="position:relative">
+                <img id="enemy-img" src="/static/{enemy_img}" style="height:220px;object-fit:contain;filter:drop-shadow(0 0 8px black)">
+                <div id="dmg-float">-5</div>
+            </div>
         </div>
+
         <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px;margin-bottom:10px">
             <div style="font-weight:bold;margin-bottom:6px">Ты HP: {mh}/20</div>
-            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px"></div></div>
+            <div style="background:#300;height:14px;border-radius:7px"><div style="width:{mhp}%;height:100%;background:linear-gradient(#4dff4d,#00b300);border-radius:7px;transition: width 0.5s"></div></div>
         </div>
         <div style="background:#000;color:#0f0;padding:8px;border-radius:8px;height:120px;overflow:auto;margin-bottom:10px;font-size:13px">{session['log']}</div>
-        <form method="post" style="display:flex;gap:8px">
-            <button name="m" value="hit" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР ДУБИНОЙ</button>
+        
+        <form id="hit-form" method="post" style="display:flex;gap:8px">
+            <input type="hidden" name="m" value="hit">
+            <button type="button" onclick="doHit()" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🗡️ УДАР ДУБИНОЙ</button>
             <button name="m" value="run" style="flex:1;background:#ccc;border:2px solid #5a3e22;border-radius:8px;padding:14px;font-weight:bold">🏃 БЕГ</button>
         </form>
     </div>
+    <script src="/static/game.js"></script>
     """
     return render_page(html, True)
 
@@ -375,7 +388,7 @@ def hero_page():
         <div style="padding:12px;background:#3b2314;min-height:calc(100vh - 50px)">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
                 <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px 10px;font-weight:bold;color:#3d2817;">🌟 ОПЫТ {exp}/{exp_need}</div>
-                <div style="background:#f5e6c0;border:2px solid #5a3e22;border-radius:14px;padding:12px 10px;font-weight:bold;color:#3d2817;">🏆 СЛАВА 0/100</div>
+                <div style="background:#f5e6c0;border:2px solid #5a3e22;border-battradius:14px;padding:12px 10px;font-weight:bold;color:#3d2817;">🏆 СЛАВА 0/100</div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start">
                 <div style="display:flex;flex-direction:column;gap:12px">
