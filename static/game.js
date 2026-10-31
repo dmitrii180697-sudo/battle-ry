@@ -1,60 +1,73 @@
 let isAnimating = false;
 
+function findHeroImg() {
+    // 1. пробуем по id
+    let hero = document.getElementById('hero-img') || document.getElementById('my-img');
+    if (hero) return hero;
+
+    // 2. ищем по названию файла - теперь ищем и barbarian
+    const all = document.querySelectorAll('img');
+    for (let img of all) {
+        const s = img.src.toLowerCase();
+        if (s.includes('barbarian') || s.includes('warrior') || s.includes('ancient') || s.includes('anim_')) {
+            hero = img; // берем последнего подходящего - это ты (справа)
+        }
+    }
+    if (hero) return hero;
+
+    // 3. fallback - правая картинка из 2х
+    if (all.length >= 2) return all[1];
+    if (all.length >= 1) return all[0];
+    return null;
+}
+
 function playHitAndThenSubmit(form) {
     if (isAnimating) return;
-    isAnimating = true;
+    const hero = findHeroImg();
     
-    // Ищем твоего героя - правая картинка с warrior
-    let hero = null;
-    const allImgs = document.querySelectorAll('img');
-    allImgs.forEach(img => {
-        if (img.src.includes('warrior') || img.src.includes('ancient')) {
-            hero = img;
-        }
-    });
-    // Если не нашли по имени - берем вторую картинку (ты справа)
-    if (!hero && allImgs.length >= 2) {
-        hero = allImgs[allImgs.length - 1];
-    }
-
     if (!hero) {
-        // Если героя не нашли - просто отправляем форму
+        console.log('Героя не нашел, отправляю сразу');
         form.submit();
         return;
     }
 
-    console.log('Бью палкой!');
+    isAnimating = true;
+    console.log('БЬЮ ПАЛКОЙ! Нашел:', hero.src);
+    
+    // чтобы было видно что сработало
     hero.style.transition = 'all 0.12s ease-out';
-    hero.src = '/static/anim_raise.png'; // ЗАМАХ
+    hero.style.outline = '3px solid yellow';
+    
+    hero.src = '/static/anim_raise.png';
     hero.style.transform = 'translateX(-15px) scale(1.05)';
 
     setTimeout(() => {
-        hero.src = '/static/anim_hit.png'; // УДАР ПО ГОЛОВЕ
-        hero.style.transform = 'translateX(-35px) translateY(10px) scale(1.15) rotate(-8deg)';
+        hero.src = '/static/anim_hit.png';
+        hero.style.transform = 'translateX(-35px) translateY(10px) scale(1.2) rotate(-8deg)';
+        hero.style.outline = '3px solid red';
 
-        // Ждем 500мс чтобы увидеть удар, потом отправляем на сервер
         setTimeout(() => {
-            hero.src = '/static/ancient_warrior.png'; // возвращаем обратно
             hero.style.transform = 'translateX(0) scale(1)';
+            hero.style.outline = 'none';
+            hero.src = '/static/barbarian_game_size.png'; // возвращаем ТВОЕГО рыжего, а не седого
             isAnimating = false;
             form.submit();
-        }, 500);
-    }, 150);
+        }, 550);
+    }, 180);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('form').forEach(form => {
         form.addEventListener('submit', (e) => {
-            const btn = e.submitter || form.querySelector('button');
             const mInput = form.querySelector('input[name="m"]');
-            const mValue = mInput ? mInput.value : (btn ? btn.value : '');
-
-            // Только для удара
-            if (mValue === 'hit' || (btn && btn.textContent.toLowerCase().includes('удар'))) {
+            const btn = e.submitter;
+            const val = (mInput ? mInput.value : '') || (btn ? btn.value : '') || btn?.textContent || '';
+            
+            if (val.toLowerCase().includes('hit') || val.toLowerCase().includes('удар') || val.includes('⚔')) {
                 e.preventDefault();
                 playHitAndThenSubmit(form);
             }
         });
     });
-    console.log('Удар с анимацией подключен!');
+    console.log('Удар v3 - под рыжего бородача подключен');
 });
