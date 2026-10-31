@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const btns = document.querySelectorAll('button, .btn-attack, #attack-btn');
     btns.forEach(b=>{
         b.addEventListener('click', ()=>{
-            if(!isAnimating) playHitAnimation(false);
+            playHitAnimation(false);
         });
     });
     console.log('Удар палкой подключен!');
