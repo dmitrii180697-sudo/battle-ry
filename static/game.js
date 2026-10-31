@@ -1,4 +1,5 @@
 let isAnimating = false;
+
 function playHitAnimation(isSuper, callback){
     if(isAnimating) return;
     isAnimating=true;
@@ -15,56 +16,53 @@ function playHitAnimation(isSuper, callback){
         if(isSuper){
             hero.style.transform='translateX(50px) translateY(15px) scale(1.25) rotate(15deg)';
             hero.style.filter='drop-shadow(0 0 15px #ff0) brightness(1.3)';
-            if(dmg) {
-                dmg.style.fontSize='58px';
-                dmg.style.color='#ffff00';
-            }
         } else {
             hero.style.transform='translateX(35px) translateY(10px) scale(1.15) rotate(10deg)';
         }
         if(enemy) enemy.style.animation='shake 0.5s ease-out';
         if(dmg) {
-            dmg.innerText='-' + (typeof lastDmg !== 'undefined' ? lastDmg : '5');
+            dmg.innerText='-5';
             dmg.classList.add('show');
-            if(isSuper) dmg.classList.add('super');
         }
         setTimeout(()=>{
             hero.style.transition='all 0.25s ease-in';
             hero.style.transform='translateX(0) scale(1)';
             hero.style.filter='';
-            if(hero) hero.src='/static/ancient_warrior.png'; // возвращаем в обычную стойку, у тебя файл так называется
+            hero.src='/static/ancient_warrior.png';
+            if(enemy) enemy.style.animation='';
             if(dmg) {
-                setTimeout(()=>{
-                    dmg.classList.remove('show','super');
-                }, 600);
+                setTimeout(()=>{ dmg.classList.remove('show'); }, 600);
             }
-            isAnimating = false; // ВОТ ЭТОГО У ТЕБЯ НЕ БЫЛО - из-за этого не бил второй раз
+            isAnimating = false;
             if(callback) callback();
         }, 500);
     }, 120);
 }
-    },130);
-}
-function doHit(isSuper){
-    if(isSuper){
-        const btn=document.getElementById('super-btn');
-        if(btn.disabled) return;
-        document.getElementById('action-input').value='super';
-    } else {
-        document.getElementById('action-input').value='hit';
-    }
-    playHitAnimation(isSuper, ()=>{ document.getElementById('hit-form').submit(); });
-}
+
+// Тряска врага и вылет -5
 const style=document.createElement('style');
-style.innerHTML=`@keyframes shake{0%{transform:scaleX(-1) translateX(0)}20%{transform:scaleX(-1) translateX(-15px)}40%{transform:scaleX(-1) translateX(15px) translateY(-5px)}60%{transform:scaleX(-1) translateX(-10px)}80%{transform:scaleX(-1) translateX(10px)}100%{transform:scaleX(-1) translateX(0)}} #enemy-img{transform:scaleX(-1)!important} .dmg{position:absolute;top:40%;left:20%;font-size:38px;font-weight:900;color:#ff2222;text-shadow:2px 2px 0 #000;opacity:0;transform:translateY(20px) scale(0.5);transition:all 0.35s cubic-bezier(0.175,0.885,0.32,1.275);pointer-events:none} .dmg.show{opacity:1;transform:translateY(-60px) scale(1.2)} .dmg.super{color:#ffff00!important;text-shadow:0 0 10px #ff0,2px 2px 0 #000!important}`;
+style.innerHTML=`
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  25%{transform:translateX(-10px) rotate(-2deg)}
+  75%{transform:translateX(10px) rotate(2deg)}
+}
+#dmg-float-enemy{position:absolute; top:40%; left:55%; font-size:42px; color:yellow; font-weight:bold; opacity:0; pointer-events:none;}
+#dmg-float-enemy.show{animation:flyUp 0.7s forwards;}
+@keyframes flyUp{
+  0%{transform:translateY(0); opacity:1}
+  100%{transform:translateY(-70px); opacity:0}
+}
+`;
 document.head.appendChild(style);
-// ПРИНУДИТЕЛЬНО ВЕШАЕМ УДАР НА КНОПКУ
+
+// Вешаем удар на все кнопки удара
 document.addEventListener('DOMContentLoaded', ()=>{
-    const btns = document.querySelectorAll('button');
+    const btns = document.querySelectorAll('button, .btn-attack, #attack-btn');
     btns.forEach(b=>{
-        if(b.textContent.toLowerCase().includes('удар') || b.textContent.toLowerCase().includes('attack') || b.textContent.toLowerCase().includes('бит')){
-            b.addEventListener('click', ()=>{ playHitAnimation(false); });
-        }
+        b.addEventListener('click', ()=>{
+            if(!isAnimating) playHitAnimation(false);
+        });
     });
     console.log('Удар палкой подключен!');
 });
