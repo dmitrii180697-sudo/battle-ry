@@ -329,11 +329,11 @@ def fight_battle():
 
     html=f'''
     <style>
-    @keyframes attackRight {{0%{{transform:translateX(0) scaleX(-1)}} 35%{{transform:translateX(35px) scaleX(-1)}} 100%{{transform:translateX(0) scaleX(-1)}} }}
-    @keyframes shake {{0%,100%{{transform:translateX(0) scaleX(-1)}} 20%{{transform:translateX(-7px) scaleX(-1)}} 40%{{transform:translateX(7px) scaleX(-1)}} 60%{{transform:translateX(-4px) scaleX(-1)}} 80%{{transform:translateX(4px) scaleX(-1)}} }}
+    @keyframes attackLeft {{0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
+    @keyframes shakeRight {{0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-7px)}} 40%{{transform:translateX(7px)}} 60%{{transform:translateX(-4px)}} 80%{{transform:translateX(4px)}} }}
     @keyframes dmgPop {{0%{{transform:translate(-50%,-50%) scale(0); opacity:0}} 20%{{transform:translate(-50%,-90%) scale(1.5); opacity:1}} 100%{{transform:translate(-50%,-140%) scale(1); opacity:0}} }}
-    .anim-attack {{animation:attackRight 0.32s ease}}
-    .anim-shake {{animation:shake 0.32s ease}}
+    .anim-attack {{animation:attackLeft 0.32s ease}}
+    .anim-shake {{animation:shakeRight 0.32s ease}}
     .dmg {{position:absolute;top:45%;left:50%;z-index:10;color:#ffeb00;font-weight:900;font-size:40px;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none}}
     .dmg.show {{animation:dmgPop 0.7s ease forwards}}
     </style>
@@ -345,16 +345,16 @@ def fight_battle():
       </div>
 
       <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
-        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.25);border-radius:13px"></div>
+        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.18);border-radius:13px"></div>
         
-        <!-- ТУТ РАЗВОРОТ: scaleX(-1) = воин смотрит на тебя -->
+        <!-- СЛЕВА ТЫ - без scaleX, смотрит вправо -->
         <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="enemyImg" src="/static/{enemy_img}" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);transform:scaleX(-1)">
+          <img id="heroImg" src="/static/barbarian_game_size.png?v=5" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);background:transparent">
         </div>
         
-        <!-- ТЫ СМОТРИШЬ НА ВОИНА -->
+        <!-- СПРАВА ВРАГ - без scaleX, смотрит влево -->
         <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="heroImg" src="/static/{HERO_IMG}" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black)">
+          <img id="enemyImg" src="/static/{enemy_img}?v=5" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);background:transparent">
         </div>
 
         <div id="dmgText" class="dmg">-{last_dmg}</div>
