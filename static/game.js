@@ -58,3 +58,13 @@ function doHit(isSuper){
 const style=document.createElement('style');
 style.innerHTML=`@keyframes shake{0%{transform:scaleX(-1) translateX(0)}20%{transform:scaleX(-1) translateX(-15px)}40%{transform:scaleX(-1) translateX(15px) translateY(-5px)}60%{transform:scaleX(-1) translateX(-10px)}80%{transform:scaleX(-1) translateX(10px)}100%{transform:scaleX(-1) translateX(0)}} #enemy-img{transform:scaleX(-1)!important} .dmg{position:absolute;top:40%;left:20%;font-size:38px;font-weight:900;color:#ff2222;text-shadow:2px 2px 0 #000;opacity:0;transform:translateY(20px) scale(0.5);transition:all 0.35s cubic-bezier(0.175,0.885,0.32,1.275);pointer-events:none} .dmg.show{opacity:1;transform:translateY(-60px) scale(1.2)} .dmg.super{color:#ffff00!important;text-shadow:0 0 10px #ff0,2px 2px 0 #000!important}`;
 document.head.appendChild(style);
+// ПРИНУДИТЕЛЬНО ВЕШАЕМ УДАР НА КНОПКУ
+document.addEventListener('DOMContentLoaded', ()=>{
+    const btns = document.querySelectorAll('button');
+    btns.forEach(b=>{
+        if(b.textContent.toLowerCase().includes('удар') || b.textContent.toLowerCase().includes('attack') || b.textContent.toLowerCase().includes('бит')){
+            b.addEventListener('click', ()=>{ playHitAnimation(false); });
+        }
+    });
+    console.log('Удар палкой подключен!');
+});
