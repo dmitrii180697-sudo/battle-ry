@@ -1,45 +1,72 @@
 let isAnimating = false;
 
+function findHeroImg() {
+    // Ищем твоего героя всеми способами
+    let hero = document.getElementById('hero-img');
+    if (hero) return hero;
+    // Если id нет - ищем по картинкам боя
+    const imgs = document.querySelectorAll('img');
+    for (let img of imgs) {
+        if (img.src.includes('warrior') || img.src.includes('anim_') || img.src.includes('ancient')) {
+            return img;
+        }
+    }
+    // Если не нашли - берем правую картинку (твой герой справа)
+    const battleImgs = document.querySelectorAll('div img, .battle img, img');
+    if (battleImgs.length >= 2) return battleImgs[1]; // правый - это ты
+    return battleImgs[0];
+}
+
+function findEnemyImg() {
+    let enemy = document.getElementById('enemy-img');
+    if (enemy) return enemy;
+    const imgs = document.querySelectorAll('img');
+    // Враг слева
+    for (let img of imgs) {
+        if (img.src.includes('barbarian') || img.src.includes('enemy')) return img;
+    }
+    const battleImgs = document.querySelectorAll('div img, .battle img, img');
+    if (battleImgs.length >= 2) return battleImgs[0];
+    return null;
+}
+
 function playHitAnimation(isSuper, callback){
     if(isAnimating) return;
     isAnimating=true;
-    const hero=document.getElementById('hero-img');
-    const enemy=document.getElementById('enemy-img');
-    const dmg=document.getElementById('dmg-float-enemy');
-    if(!hero || !enemy) { isAnimating=false; return; }
+    const hero = findHeroImg();
+    const enemy = findEnemyImg();
+    console.log('Бью! Герой:', hero?.src);
+
+    if(!hero) { isAnimating=false; return; }
     
     hero.style.transition='all 0.12s ease-out';
-    hero.src='/static/anim_raise.png';
+    hero.src='/static/anim_raise.png'; // ЗАМАХ
     hero.style.transform='translateX(-15px) scale(1.05)';
+    
     setTimeout(()=>{
-        hero.src='/static/anim_hit.png';
+        hero.src='/static/anim_hit.png'; // УДАР ПАЛКОЙ ПО ГОЛОВЕ
         if(isSuper){
-            hero.style.transform='translateX(50px) translateY(15px) scale(1.25) rotate(15deg)';
-            hero.style.filter='drop-shadow(0 0 15px #ff0) brightness(1.3)';
+            hero.style.transform='translateX(-50px) translateY(15px) scale(1.25) rotate(-15deg)';
         } else {
-            hero.style.transform='translateX(35px) translateY(10px) scale(1.15) rotate(10deg)';
+            hero.style.transform='translateX(-35px) translateY(10px) scale(1.15) rotate(-10deg)';
         }
-        if(enemy) enemy.style.animation='shake 0.5s ease-out';
-        if(dmg) {
-            dmg.innerText='-5';
-            dmg.classList.add('show');
+        if(enemy) {
+            enemy.style.transition='all 0.1s';
+            enemy.style.animation='shake 0.5s ease-out';
+            enemy.style.transform='translateX(10px)';
+            setTimeout(()=>{ enemy.style.transform='translateX(0)'; }, 100);
         }
         setTimeout(()=>{
             hero.style.transition='all 0.25s ease-in';
             hero.style.transform='translateX(0) scale(1)';
-            hero.style.filter='';
-            hero.src='/static/ancient_warrior.png';
+            hero.src='/static/ancient_warrior.png'; // возвращаем обратно
             if(enemy) enemy.style.animation='';
-            if(dmg) {
-                setTimeout(()=>{ dmg.classList.remove('show'); }, 600);
-            }
             isAnimating = false;
             if(callback) callback();
         }, 500);
-    }, 120);
+    }, 150);
 }
 
-// Тряска врага и вылет -5
 const style=document.createElement('style');
 style.innerHTML=`
 @keyframes shake{
@@ -47,22 +74,35 @@ style.innerHTML=`
   25%{transform:translateX(-10px) rotate(-2deg)}
   75%{transform:translateX(10px) rotate(2deg)}
 }
-#dmg-float-enemy{position:absolute; top:40%; left:55%; font-size:42px; color:yellow; font-weight:bold; opacity:0; pointer-events:none;}
-#dmg-float-enemy.show{animation:flyUp 0.7s forwards;}
-@keyframes flyUp{
-  0%{transform:translateY(0); opacity:1}
-  100%{transform:translateY(-70px); opacity:0}
-}
 `;
 document.head.appendChild(style);
 
-// Вешаем удар на все кнопки удара
+// Вешаем на кнопки боя
 document.addEventListener('DOMContentLoaded', ()=>{
-    const btns = document.querySelectorAll('button, .btn-attack, #attack-btn');
-    btns.forEach(b=>{
-        b.addEventListener('click', ()=>{
-            playHitAnimation(false);
+    // Находим кнопки УДАР по тексту
+    const checkBtn = setInterval(()=>{
+        const btns = document.querySelectorAll('button, div[onclick], img[onclick]');
+        btns.forEach(b=>{
+            const txt = (b.textContent || b.innerText || '').toLowerCase();
+            if(txt.includes('удар') || b.id?.toLowerCase().includes('attack')){
+                if(!b.dataset.hitBound){
+                    b.dataset.hitBound='1';
+                    b.addEventListener('click', ()=>{ playHitAnimation(false); });
+                }
+            }
         });
+    }, 500);
+    
+    // Также ловим клик по всему документу на кнопку с иконкой мечей
+    document.addEventListener('click', (e)=>{
+        const t = e.target;
+        if(t.closest && t.closest('button')){
+            const btn = t.closest('button');
+            if(btn.textContent.includes('⚔') || btn.innerHTML.includes('attack') || btn.textContent.toLowerCase().includes('удар')){
+                playHitAnimation(false);
+            }
+        }
     });
-    console.log('Удар палкой подключен!');
+    
+    console.log('Удар палкой подключен! Версия 2');
 });
