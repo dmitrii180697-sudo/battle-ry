@@ -34,7 +34,7 @@ def get_db():
         return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     else:
         import sqlite3
-        conn = sqlite3.connect('/tmp/battle.db')
+        conn = sqlite3.connect('battle.db')
         conn.row_factory = sqlite3.Row
         return conn
 
