@@ -5,34 +5,44 @@ function playHitAnimation(isSuper, callback){
     const hero=document.getElementById('hero-img');
     const enemy=document.getElementById('enemy-img');
     const dmg=document.getElementById('dmg-float-enemy');
+    if(!hero || !enemy) { isAnimating=false; return; }
+    
     hero.style.transition='all 0.12s ease-out';
     hero.src='/static/anim_raise.png';
     hero.style.transform='translateX(-15px) scale(1.05)';
     setTimeout(()=>{
         hero.src='/static/anim_hit.png';
         if(isSuper){
-            hero.style.transform='translateX(50px) scale(1.25) rotate(-10deg)';
+            hero.style.transform='translateX(50px) translateY(15px) scale(1.25) rotate(15deg)';
             hero.style.filter='drop-shadow(0 0 15px #ff0) brightness(1.3)';
-            dmg.style.fontSize='58px';
-            dmg.style.color='#ffff00';
+            if(dmg) {
+                dmg.style.fontSize='58px';
+                dmg.style.color='#ffff00';
+            }
         } else {
-            hero.style.transform='translateX(35px) scale(1.1)';
+            hero.style.transform='translateX(35px) translateY(10px) scale(1.15) rotate(10deg)';
         }
-        enemy.style.animation='shake 0.5s ease-out';
-        dmg.innerText='-' + lastDmg;
-        dmg.classList.add('show');
-        if(isSuper) dmg.classList.add('super');
+        if(enemy) enemy.style.animation='shake 0.5s ease-out';
+        if(dmg) {
+            dmg.innerText='-' + (typeof lastDmg !== 'undefined' ? lastDmg : '5');
+            dmg.classList.add('show');
+            if(isSuper) dmg.classList.add('super');
+        }
         setTimeout(()=>{
             hero.style.transition='all 0.25s ease-in';
-            hero.src='/static/barbarian_game_size.png';
             hero.style.transform='translateX(0) scale(1)';
-            hero.style.filter='drop-shadow(0 0 10px black)';
-            dmg.classList.remove('show','super');
-            dmg.style.fontSize='38px';
-            dmg.style.color='#ff2222';
-            isAnimating=false;
+            hero.style.filter='';
+            if(hero) hero.src='/static/ancient_warrior.png'; // возвращаем в обычную стойку, у тебя файл так называется
+            if(dmg) {
+                setTimeout(()=>{
+                    dmg.classList.remove('show','super');
+                }, 600);
+            }
+            isAnimating = false; // ВОТ ЭТОГО У ТЕБЯ НЕ БЫЛО - из-за этого не бил второй раз
             if(callback) callback();
-        }, isSuper ? 600 : 350);
+        }, 500);
+    }, 120);
+}
     },130);
 }
 function doHit(isSuper){
