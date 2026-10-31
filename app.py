@@ -373,22 +373,30 @@ def fight_battle():
       </form>
     </div>
 
-    <script>
+        <script>
+    let isHitting = false;
     function doHit(type){{
+      if(isHitting) return;
       if(type=='super' && {hit_cnt} < 5) return;
+      isHitting = true;
       const hero = document.getElementById('heroImg');
       const enemy = document.getElementById('enemyImg');
       const dmg = document.getElementById('dmgText');
       const form = document.getElementById('fightForm');
-      
-      hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
-      enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
-      dmg.classList.remove('show'); void dmg.offsetWidth; dmg.classList.add('show');
+
+      hero.src = '/static/anim_raise.png?v=99';
 
       setTimeout(()=>{{
-        document.getElementById('mInput').value = type;
-        form.submit();
-      }}, 320);
+        hero.src = '/static/anim_hit.png?v=99';
+        hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
+        enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
+        dmg.classList.remove('show'); void dmg.offsetWidth; dmg.classList.add('show');
+
+        setTimeout(()=>{{
+          document.getElementById('mInput').value = type;
+          form.submit();
+        }}, 400);
+      }}, 220);
     }}
     </script>
     '''
