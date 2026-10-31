@@ -272,21 +272,20 @@ def fight_battle():
 
     if request.method=="POST":
         m=request.form.get("m")
+        if m=="run":
+            return redirect("/promysel")
         if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
             dmg=random.randint(3,7)
             session["enemy_hp"]-=dmg
             session["hit_count"]=session.get("hit_count",0)+1
             session["last_dmg"]=dmg
+            session["last_who"]="enemy"
         if m=="super" and session.get("hit_count",0)>=5:
             dmg=random.randint(10,18)
             session["enemy_hp"]-=dmg
             session["hit_count"]=0
             session["last_dmg"]=dmg
-            session["is_super"]=True
-        else:
-            session["is_super"]=False
-        if m=="run":
-            return redirect("/promysel")
+            session["last_who"]="enemy"
         if session["enemy_hp"]>0 and session["my_hp"]>0 and m in ["hit","super"]:
             try:
                 emin,emax=session.get("enemy_dmg",[2,5])
@@ -302,6 +301,7 @@ def fight_battle():
             add_win(session["uid"])
             add_reward(session["uid"], session.get("reward_g",0), session.get("reward_s",0), session.get("reward_r",0))
             session["rewarded"]=True
+        return redirect("/fight_battle")
 
     cur_enemy_hp=max(0, session.get("enemy_hp",0))
     cur_my_hp=max(0, session.get("my_hp",0))
@@ -328,17 +328,36 @@ def fight_battle():
         return render_template_string(html)
 
     html=f'''
+    <style>
+    @keyframes attackRight {{0%{{transform:translateX(0) scaleX(-1)}} 35%{{transform:translateX(35px) scaleX(-1)}} 100%{{transform:translateX(0) scaleX(-1)}} }}
+    @keyframes shake {{0%,100%{{transform:translateX(0) scaleX(-1)}} 20%{{transform:translateX(-7px) scaleX(-1)}} 40%{{transform:translateX(7px) scaleX(-1)}} 60%{{transform:translateX(-4px) scaleX(-1)}} 80%{{transform:translateX(4px) scaleX(-1)}} }}
+    @keyframes dmgPop {{0%{{transform:translate(-50%,-50%) scale(0); opacity:0}} 20%{{transform:translate(-50%,-90%) scale(1.5); opacity:1}} 100%{{transform:translate(-50%,-140%) scale(1); opacity:0}} }}
+    .anim-attack {{animation:attackRight 0.32s ease}}
+    .anim-shake {{animation:shake 0.32s ease}}
+    .dmg {{position:absolute;top:45%;left:50%;z-index:10;color:#ffeb00;font-weight:900;font-size:40px;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none}}
+    .dmg.show {{animation:dmgPop 0.7s ease forwards}}
+    </style>
+
     <div style="max-width:420px;margin:0 auto;padding:10px">
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span>{cur_enemy_hp}/{enemy_max_hp}</span></div>
         <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{enemy_per}%;height:100%;background:#ff3b30"></div></div>
       </div>
 
-      <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative">
+      <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
         <div style="position:absolute;inset:0;background:rgba(255,248,220,0.25);border-radius:13px"></div>
-        <div style="flex:1;text-align:center;z-index:2"><img src="/static/{HERO_IMG}" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
-        <div style="flex:1;text-align:center;z-index:2"><img src="/static/{enemy_img}" style="height:210px;object-fit:contain;background:transparent;filter:drop-shadow(0 4px 12px black)"></div>
-        <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);z-index:5;color:#ff0;font-weight:900;font-size:32px;text-shadow:2px 2px 0 #000;display:{'block' if last_dmg else 'none'}">-{last_dmg}</div>
+        
+        <!-- ТУТ РАЗВОРОТ: scaleX(-1) = воин смотрит на тебя -->
+        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
+          <img id="enemyImg" src="/static/{enemy_img}" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);transform:scaleX(-1)">
+        </div>
+        
+        <!-- ТЫ СМОТРИШЬ НА ВОИНА -->
+        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
+          <img id="heroImg" src="/static/{HERO_IMG}" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black)">
+        </div>
+
+        <div id="dmgText" class="dmg">-{last_dmg}</div>
       </div>
 
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
@@ -346,12 +365,32 @@ def fight_battle():
         <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{my_per}%;height:100%;background:#2ecc40"></div></div>
       </div>
 
-      <form method="post" style="display:flex;gap:8px">
-        <button name="m" value="hit" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:14px;padding:8px"><img src="/static/sword_normal.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ffb84d;font-weight:900;font-size:11px">УДАР [{hit_cnt}]</div></button>
-        <button name="m" value="super" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:14px;padding:8px;opacity:{opac}"><img src="/static/sword_super.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ff0;font-weight:900;font-size:11px">{super_label}</div></button>
+      <form id="fightForm" method="post" style="display:flex;gap:8px">
+        <button type="button" onclick="doHit('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:14px;padding:8px"><img src="/static/sword_normal.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ffb84d;font-weight:900;font-size:11px">УДАР [{hit_cnt}]</div></button>
+        <button type="button" onclick="doHit('super')" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:14px;padding:8px;opacity:{opac}"><img src="/static/sword_super.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ff0;font-weight:900;font-size:11px">{super_label}</div></button>
         <button name="m" value="run" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:8px 14px;font-weight:900">БЕГ</button>
+        <input type="hidden" name="m" id="mInput">
       </form>
     </div>
+
+    <script>
+    function doHit(type){{
+      if(type=='super' && {hit_cnt} < 5) return;
+      const hero = document.getElementById('heroImg');
+      const enemy = document.getElementById('enemyImg');
+      const dmg = document.getElementById('dmgText');
+      const form = document.getElementById('fightForm');
+      
+      hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
+      enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
+      dmg.classList.remove('show'); void dmg.offsetWidth; dmg.classList.add('show');
+
+      setTimeout(()=>{{
+        document.getElementById('mInput').value = type;
+        form.submit();
+      }}, 320);
+    }}
+    </script>
     '''
     return render_template_string(html)
 
