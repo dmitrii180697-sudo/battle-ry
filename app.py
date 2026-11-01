@@ -261,71 +261,231 @@ def fight(monster):
     session["log"]=f"Встретил {cfg['name']}!"
     return redirect("/fight_battle")
 
-@app.route("/fight_battle", methods=["GET","POST"])
+@app.route("/fight_battle", methods=["GET", "POST"])
 def fight_battle():
     if "uid" not in session:
         return redirect("/")
     if "enemy_hp" not in session:
         return redirect("/promysel")
     if "hit_count" not in session:
-        session["hit_count"]=0
+        session["hit_count"] = 0
 
-    if request.method=="POST":
-        m=request.form.get("m")
-        if m=="run":
-            return redirect("/promysel")
-        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
-            dmg=random.randint(3,7)
-            session["enemy_hp"]-=dmg
-            session["hit_count"]=session.get("hit_count",0)+1
-            session["last_dmg"]=dmg
-            session["last_who"]="enemy"
-        if m=="super" and session.get("hit_count",0)>=5:
-            dmg=random.randint(10,18)
-            session["enemy_hp"]-=dmg
-            session["hit_count"]=0
-            session["last_dmg"]=dmg
-            session["last_who"]="enemy"
-        if session["enemy_hp"]>0 and session["my_hp"]>0 and m in ["hit","super"]:
+    p = get_player(session["uid"])
+    lvl, my_max_hp, rubin, gold, silver = vals(p)
+    
+    # Обработка AJAX запроса во время боя (без перезагрузки страницы)
+    if request.is_json:
+        data = request.get_json()
+        m = data.get("m")
+        
+        if m == "run":
+            return {"status": "redirect", "url": "/promysel"}
+            
+        cur_my_hp = session.get("my_hp", my_max_hp)
+        cur_enemy_hp = session.get("enemy_hp", 20)
+        
+        # Действие игрока
+        log_msg = ""
+        if m == "hit" and cur_my_hp > 0 and cur_enemy_hp > 0:
+            dmg = random.randint(3, 7)
+            cur_enemy_hp = max(0, cur_enemy_hp - dmg)
+            session["enemy_hp"] = cur_enemy_hp
+            session["hit_count"] = session.get("hit_count", 0) + 1
+            log_msg = f"Вы нанесли противнику {dmg урона."
+            last_dmg = dmg
+            last_who = "enemy"
+            
+        elif m == "super" and session.get("hit_count", 0) >= 5 and cur_my_hp > 0 and cur_enemy_hp > 0:
+            dmg = random.randint(10, 18)
+            cur_enemy_hp = max(0, cur_enemy_hp - dmg)
+            session["enemy_hp"] = cur_enemy_hp
+            session["hit_count"] = 0
+            log_msg = f"Супер-удар! Вы нанесли {dmg} урона!"
+            last_dmg = dmg
+            last_who = "enemy"
+            
+        # Если слот зелья (например, от 1 до 10)
+        elif str(m).startswith("potion_"):
+            # Здесь можно прописать логику лечения зельем
+            heal = 10
+            cur_my_hp = min(my_max_hp, cur_my_hp + heal)
+            session["my_hp"] = cur_my_hp
+            log_msg = f"Вы выпили зелье и восстановили {heal} HP!"
+            last_dmg = 0
+            last_who = "player"
+
+        # Ответный удар монстра, если он еще жив
+        edmg = 0
+        if cur_enemy_hp > 0 and cur_my_hp > 0 and m in ["hit", "super"]:
             try:
-                emin,emax=session.get("enemy_dmg",[2,5])
-                ed=random.randint(int(emin),int(emax))
+                emin, emax = session.get("enemy_dmg", [2, 5])
+                edmg = random.randint(int(emin), int(emax))
             except:
-                ed=random.randint(2,5)
-            session["my_hp"]-=ed
-            session["last_edmg"]=ed
-        if session["my_hp"]<=0 and not session.get("rewarded"):
-            add_loss(session["uid"])
-            session["rewarded"]=True
-        if session["enemy_hp"]<=0 and not session.get("rewarded"):
+                edmg = random.randint(2, 5)
+            cur_my_hp = max(0, cur_my_hp - edmg)
+            session["my_hp"] = cur_my_hp
+
+        # Проверка на победу / поражение
+        finished = False
+        if cur_enemy_hp <= 0 and not session.get("rewarded"):
             add_win(session["uid"])
-            add_reward(session["uid"], session.get("reward_g",0), session.get("reward_s",0), session.get("reward_r",0))
-            session["rewarded"]=True
-        return redirect("/fight_battle")
+            add_reward(session["uid"], session.get("reward_g", 0), session.get("reward_s", 0), session.get("reward_r", 0))
+            session["rewarded"] = True
+            finished = True
+        elif cur_my_hp <= 0 and not session.get("rewarded"):
+            add_loss(session["uid"])
+            session["rewarded"] = True
+            finished = True
 
-    cur_enemy_hp=max(0, session.get("enemy_hp",0))
-    cur_my_hp=max(0, session.get("my_hp",0))
-    enemy_max_hp=session.get("enemy_max",20)
-    enemy_per=int(cur_enemy_hp*100/enemy_max_hp) if enemy_max_hp else 0
-    my_per=int(cur_my_hp*100/20) if cur_my_hp else 0
-    enemy_img=session.get("enemy_img","ancient_warrior.png")
-    enemy_name=session.get("enemy_name","Древний воин")
-    hit_cnt=session.get("hit_count",0)
-    is_super=hit_cnt>=5
-    camp_bg="camp.jpg"
-    super_label="x5 ГОТОВ!" if is_super else f"{hit_cnt}/5"
-    opac=1 if is_super else 0.4
-    last_dmg=session.get("last_dmg",0)
+        return {
+            "enemy_hp": cur_enemy_hp,
+            "enemy_max": session.get("enemy_max", 20),
+            "my_hp": cur_my_hp,
+            "my_max": my_max_hp,
+            "hit_cnt": session.get("hit_count", 0),
+            "last_dmg": last_dmg if 'last_dmg' in locals() else 0,
+            "edmg": edmg,
+            "finished": finished,
+            "is_win": cur_enemy_hp <= 0,
+            "log": log_msg
+        }
 
-    if cur_enemy_hp<=0 or cur_my_hp<=0:
-        is_win=cur_enemy_hp<=0
-        title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
-        col="#00ff66" if is_win else "#ff3333"
-        reward_text=""
-        if is_win:
-            reward_text=f"<p style='font-weight:900'>+{session.get('reward_g',0)} 🪙 +{session.get('reward_s',0)} ⚪ +{session.get('reward_r',0)} 💎</p>"
-        html=f'<div style="min-height:100vh;background:#1a0e0a;display:flex;align-items:center;justify-content:center"><div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center"><h1 style="color:{col}">{title}</h1>{reward_text}<a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900;margin-top:10px">В ЛАГЕРЬ</a></div></div>'
-        return render_template_string(html)
+    # Рендер начальной страницы боя
+    cur_enemy_hp = max(0, session.get("enemy_hp", 0))
+    cur_my_hp = max(0, session.get("my_hp", my_max_hp))
+    enemy_max_hp = session.get("enemy_max", 20)
+    enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
+    my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0
+    enemy_img = session.get("enemy_img", "ancient_warrior.png")
+    enemy_name = session.get("enemy_name", "Древний воин")
+    hit_cnt = session.get("hit_count", 0)
+
+    html = f'''
+    <style>
+    body {{ background: #1a0e0a; margin: 0; font-family: Arial; }}
+    .fight-wrap {{ max-width: 420px; margin: 0 auto; padding: 10px; box-sizing: border-box; }}
+    @keyframes attackLeft {{ 0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
+    @keyframes shakeRight {{ 0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-7px)}} 40%{{transform:translateX(7px)}} }}
+    .anim-attack {{ animation: attackLeft 0.32s ease; }}
+    .anim-shake {{ animation: shakeRight 0.32s ease; }}
+    
+    /* Панель 10 кнопок внизу в стиле браузерных RPG */
+    .potions-bar {{
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 3px;
+        background: #2b1a0e;
+        padding: 6px;
+        border: 2px solid #5a3e22;
+        border-radius: 8px;
+        margin-top: 10px;
+    }}
+    .potion-slot {{
+        background: linear-gradient(#4a3525, #2b1a0e);
+        border: 1px solid #8a6a3d;
+        border-radius: 4px;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffb84d;
+        font-weight: bold;
+        font-size: 10px;
+        cursor: pointer;
+        text-align: center;
+    }}
+    .potion-slot:active {{ background: #ff8c00; color: #fff; }}
+    </style>
+
+    <div class="fight-wrap">
+      <!-- Здоровье противника -->
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span id="enemyName">{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
+        <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.3s"></div></div>
+      </div>
+
+      <!-- Арена с персонажами -->
+      <div style="background:url(/static/camp.jpg) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:260px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
+        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
+          <img id="heroImg" src="/static/barbarian_game_size.png" style="height:160px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);">
+        </div>
+        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
+          <img id="enemyImg" src="/static/{enemy_img}" style="height:160px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);">
+        </div>
+      </div>
+
+      <!-- Здоровье игрока -->
+      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span><span id="myHp">{cur_my_hp}</span>/{my_max_hp}</span></div>
+        <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="myBar" style="width:{my_per}%;height:100%;background:#2ecc40;transition:width 0.3s"></div></div>
+      </div>
+
+      <!-- Кнопки ударов -->
+      <div style="display:flex;gap:8px">
+        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:12px;padding:6px;cursor:pointer">
+          <div style="color:#ffb84d;font-weight:900;font-size:12px">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>)</div>
+        </button>
+        <button type="button" onclick="makeAction('super')" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:12px;padding:6px;cursor:pointer">
+          <div style="color:#ff0;font-weight:900;font-size:12px">⚡ СУПЕР</div>
+        </button>
+        <button type="button" onclick="makeAction('run')" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:6px 12px;font-weight:900;cursor:pointer">БЕГ</button>
+      </div>
+
+      <!-- НИЖНЯЯ ПАНЕЛЬ ИЗ 10 КНОПОК (Зелья / Эликсиры / Скиллы) -->
+      <div class="potions-bar">
+        <div class="potion-slot" onclick="makeAction('potion_1')">🍷1</div>
+        <div class="potion-slot" onclick="makeAction('potion_2')">🧪2</div>
+        <div class="potion-slot" onclick="makeAction('potion_3')">📜3</div>
+        <div class="potion-slot" onclick="makeAction('potion_4')">🛡️4</div>
+        <div class="potion-slot" onclick="makeAction('potion_5')">⚡5</div>
+        <div class="potion-slot" onclick="makeAction('potion_6')">🔮6</div>
+        <div class="potion-slot" onclick="makeAction('potion_7')">❤️7</div>
+        <div class="potion-slot" onclick="makeAction('potion_8')">⭐8</div>
+        <div class="potion-slot" onclick="makeAction('potion_9')">🟢9</div>
+        <div class="potion-slot" onclick="makeAction('potion_10')">🔵10</div>
+      </div>
+    </div>
+
+    <script>
+    async function makeAction(type) {{
+        const hero = document.getElementById('heroImg');
+        const enemy = document.getElementById('enemyImg');
+        
+        if(type === 'hit' || type === 'super') {{
+            hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
+            enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
+        }}
+
+        let response = await fetch('/fight_battle', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ m: type }})
+        }});
+        
+        let data = await response.json();
+        
+        if(data.status === 'redirect') {{
+            window.location.href = data.url;
+            return;
+        }}
+
+        if(data.finished) {{
+            window.location.reload();
+            return;
+        }}
+
+        // Обновляем данные на экране без перезагрузки
+        document.getElementById('enHp').innerText = data.enemy_hp;
+        document.getElementById('enBar.style').width = (data.enemy_hp * 100 / data.enemy_max) + '%';
+        
+        document.getElementById('myHp').innerText = data.my_hp;
+        document.getElementById('myBar').style.width = (data.my_hp * 100 / data.my_max) + '%';
+        
+        document.getElementById('hitCnt').innerText = data.hit_cnt;
+    }}
+    </script>
+    '''
+    return render_template_string(html)
 
     html=f'''
     <style>
