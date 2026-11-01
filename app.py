@@ -97,11 +97,20 @@ def add_reward(uid, add_g, add_s, add_r):
 
 def add_win(uid):
     try:
+        rg = session.get("reward_g", 0)
+        rs = session.get("reward_s", 0)
+        rr = session.get("reward_r", 0)
         conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1 WHERE id=%s",(uid,))
-        else: cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1 WHERE id=?",(uid,))
+        if DATABASE_URL:
+            cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1, gold=COALESCE(gold,0)+%s, silver=COALESCE(silver,0)+%s, rubin=COALESCE(rubin,0)+%s, exp=COALESCE(exp,0)+10 WHERE id=%s",(rg, rs, rr, uid))
+            cur.execute("UPDATE players SET level=level+1, exp=0 WHERE id=%s AND exp >= level*100", (uid,))
+        else:
+            cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1, gold=COALESCE(gold,0)+?, silver=COALESCE(silver,0)+?, rubin=COALESCE(rubin,0)+?, exp=COALESCE(exp,0)+10 WHERE id=?",(rg, rs, rr, uid))
+            cur.execute("UPDATE players SET level=level+1, exp=0 WHERE id=? AND exp >= level*100", (uid,))
         conn.commit(); cur.close(); conn.close()
-    except: pass
+        convert_silver(uid)
+    except Exception as e:
+        print(f"add_win error {e}")
 
 def add_loss(uid):
     try:
@@ -247,17 +256,17 @@ def fight(monster):
     if "uid" not in session:
         return redirect("/")
     p = get_player(session["uid"])
-    l,h,r,g,s = vals(p)
+    l,h,r,g,s_ = vals(p)
     cfg = MONSTERS_CFG.get(monster, MONSTERS_CFG["warrior"])
     session["enemy_type"] = monster
     session["enemy_hp"] = cfg.get("hp", 20)
     session["enemy_max"] = cfg.get("hp", 20)
-    session["enemy_dmg"] = cfg.get("dmg", [2,5])
+    session["enemy_dmg"] = cfg.get("dmg", (2,4))
     session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
     session["my_hp"] = h
     session["hit_count"] = 0
     session["rewarded"] = False
-    session["reward_g"] = cfg.get("gold", 5)
+    session["reward_g"] = cfg.get("gold", 2)
     session["reward_s"] = cfg.get("silver", 10)
     session["reward_r"] = cfg.get("rubin", 0)
     session.modified = True
@@ -373,17 +382,18 @@ def fight_battle():
       <div class="potions-bar">
         <div class="potion-slot">🍷1</div><div class="potion-slot">🧪2</div><div class="potion-slot">📜3</div><div class="potion-slot">🛡️4</div><div class="potion-slot">⚡5</div><div class="potion-slot">🔮6</div><div class="potion-slot">❤️7</div><div class="potion-slot">⭐8</div><div class="potion-slot">🟢9</div><div class="potion-slot">🔵10</div>
       </div>
-      <div id="endFrame" class="frame-end">
-        <h2 id="endTitle" style="margin:0 0 10px 0;color:gold"></h2>
-        <div id="trophyBox" style="background:rgba(255,215,0,0.1);border:1px solid #c9a45c;border-radius:10px;padding:10px;margin:10px 0;font-size:14px;line-height:1.6"></div>
-        <a href="/promysel" style="display:inline-block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:10px 25px;border-radius:10px;font-weight:900;text-decoration:none;margin-top:10px">На промысел ➔</a>
-      </div>
-      <p id="log" style="text-align:center;color:#ffcc66;min-height:20px"></p>
+      </div> <div id="endOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px">
+  <div style="background:linear-gradient(#3a2510,#1a0e0a);border:3px solid #ffcc00;border-radius:22px;padding:26px;width:100%;max-width:320px;text-align:center;box-shadow:0 0 60px gold">
+    <h2 id="endTitle" style="margin:0;color:gold;font-size:28px"></h2>
+    <div id="trophyBox" style="background:rgba(255,215,0,0.12);border:1.5px solid #c9a45c;border-radius:14px;padding:14px;margin:14px 0;font-size:16px;line-height:2;color:#ffe9a3"></div>
+    <a href="/promysel" style="display:block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:14px;border-radius:12px;font-weight:900;text-decoration:none">На промысел ➔</a>
+  </div>
+</div>
     </div>
     <script>
     async function makeAction(type) {{
-        const endF = document.getElementById('endFrame');
-        if(endF && endF.style.display=='block') return;
+       const overlay = document.getElementById('endOverlay');
+if(overlay && overlay.style.display=='flex') return;
         const hero = document.getElementById('heroImg');
         const enemy = document.getElementById('enemyImg');
         if(type === 'hit' || type === 'super') {{
@@ -399,18 +409,18 @@ def fight_battle():
         document.getElementById('myBar').style.width = (data.my_hp * 100 / data.my_max) + '%';
         document.getElementById('hitCnt').innerText = data.hit_cnt;
         document.getElementById('log').innerText = data.last_dmg ? `Ты ${{data.last_dmg}} / Враг ${{data.edmg}}` : '';
-        if(data.finished) {{
-            document.querySelectorAll('button, .potion-slot').forEach(b=>{{ b.style.pointerEvents='none'; b.style.opacity='0.4'; }});
-            endF.style.display='block';
-            document.getElementById('endTitle').innerText = data.is_win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ';
-            let box = document.getElementById('trophyBox');
-            if(data.is_win) {{
-                box.innerHTML = `Трофеи с монстра:<br>💰 Золото: +${{data.reward_g}}<br>🪙 Серебро: +${{data.reward_s}}<br>${{data.reward_r>0 ? '💎 Рубины: +' + data.reward_r + '<br>' : ''}}✨ Опыт: +10`;
-            }} else {{
-                box.innerHTML = `Ты пал в бою...<br>Попробуй снова, воин!`;
-            }}
-        }}
+        if(data.finished){{
+          document.getElementById('fightWrap').style.opacity='0.15';
+          document.getElementById('fightWrap').style.pointerEvents='none';
+          document.getElementById('endOverlay').style.display='flex';
+          document.getElementById('endTitle').innerText=data.is_win?'🏆 ПОБЕДА!':'💀 ПОРАЖЕНИЕ';
+          let box=document.getElementById('trophyBox');
+          if(data.is_win){{
+            box.innerHTML=`ТРОФЕИ С МОНСТРА<br><br>💰 Золото: <b>+${{data.reward_g}}</b><br>🪙 Серебро: <b>+${{data.reward_s}}</b><br>⭐ Опыт: <b>+10</b>`;
+        }}else{{
+          box.innerHTML=`Ты пал в бою...<br>Попробуй снова, воин!`;
     }}
+}}
     </script>
     '''
     return render_page(html, True)
