@@ -340,6 +340,25 @@ def fight_battle():
         super_label=super_label, last_dmg=last_dmg
     )
 
+    # Этот HTML победы тоже без рамки
+    if cur_enemy_hp<=0 or cur_my_hp<=0:
+        is_win=cur_enemy_hp<=0
+        title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
+        col="#00ff66" if is_win else "#ff3333"
+        reward_text=""
+        if is_win:
+            reward_text=f"<p style='font-weight:900'>+{session.get('reward_g',0)} 🪙 +{session.get('reward_s',0)} ⚪ +{session.get('reward_r',0)} 💎</p>"
+        html=f'<div style="min-height:100vh;background:#1a0e0a;display:flex;align-items:center;justify-content:center"><div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center"><h1 style="color:{col}">{title}</h1>{reward_text}<a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900;margin-top:10px">В ЛАГЕРЬ</a></div></div>'
+        return render_template_string(html)
+
+    return render_template("fight.html", 
+        cur_enemy_hp=cur_enemy_hp, cur_my_hp=cur_my_hp,
+        enemy_per=enemy_per, my_per=my_per,
+        enemy_img=enemy_img, enemy_name=enemy_name,
+        hit_cnt=hit_cnt, is_super=is_super,
+        super_label=super_label, last_dmg=last_dmg
+    )
+
     html=f'''
     <style>
     @keyframes attackLeft {{0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
