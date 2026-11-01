@@ -260,36 +260,76 @@ def fight(monster):
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET", "POST"])
-async function makeAction(type) {
-    const hero = document.getElementById('heroImg');
-    const enemy = document.getElementById('enemyImg');
+def fight_battle():
+    if "uid" not in session:
+        return redirect("/")
+    if "enemy_hp" not in session:
+        return redirect("/promysel")
+
+    p = get_player(session["uid"])
+    lvl, my_max_hp, rubin, gold, silver = vals(p)
+
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        m = data.get("m") or request.form.get("m", "hit")
+        if m == "run":
+            return jsonify({"status": "redirect", "url": "/promysel"})
+        cur_my = session.get("my_hp", my_max_hp)
+        cur_en = session.get("enemy_hp", 20)
+        hit_cnt = session.get("hit_count", 0)
+        dmg = 0
+        edmg = 0
+        if m == "hit" and cur_my > 0 and cur_en > 0:
+            dmg = random.randint(3, 7)
+            cur_en = max(0, cur_en - dmg)
+            hit_cnt += 1
+        elif m == "super" and hit_cnt >= 5:
+            dmg = random.randint(10, 18)
+            cur_en = max(0, cur_en - dmg)
+            hit_cnt = 0
+        if cur_en > 0 and m in ["hit", "super"]:
+            emin, emax = session.get("enemy_dmg", [2,5])
+            edmg = random.randint(emin, emax)
+            cur_my = max(0, cur_my - edmg)
+
+        session["enemy_hp"] = cur_en
+        session["my_hp"] = cur_my
+        session["hit_count"] = hit_cnt
+        session.modified = True
+
+        finished = False
+        if cur_en <= 0 and not session.get("rewarded"):
+            add_win(session["uid"])
+            session["rewarded"] = True
+            finished = True
+        if cur_my <= 0 and not session.get("rewarded"):
+            add_loss(session["uid"])
+            session["rewarded"] = True
+            finished = True
+
+        return jsonify({
+            "enemy_hp": cur_en,
+            "enemy_max": session.get("enemy_max", 20),
+            "my_hp": cur_my,
+            "my_max": my_max_hp,
+            "hit_cnt": hit_cnt,
+            "last_dmg": dmg,
+            "edmg": edmg,
+            "finished": finished,
+            "is_win": cur_en <= 0
+        })
+
+    # GET - отрисовка боя
+    cur_enemy_hp = session.get("enemy_hp", 20)
+    enemy_max_hp = session.get("enemy_max", 20)
+    cur_my_hp = session.get("my_hp", my_max_hp)
+    hit_cnt = session.get("hit_count", 0)
+    enemy_name = session.get("enemy_type", "Воин")
+    enemy_img = session.get("enemy_img", "ent_warrior.png") # если у тебя другое имя, поменяй тут
     
-    // блок если уже конец боя
-    if(document.getElementById('endFrame') && document.getElementById('endFrame').style.display=='block') return;
+    my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0
+    enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
 
-    if(type === 'hit' || type === 'super') {
-        hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
-        enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
-    }
-
-    let response = await fetch('/fight_battle', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({m: type})
-    });
-
-    let data = await response.json();
-    if(data.status == 'redirect'){ location=data.url; return; }
-
-    // тут твой код обновления ХП (оставь как был)
-
-    if(data.finished){
-        document.querySelectorAll('.potion-slot, button').forEach(b=>{ b.style.pointerEvents='none'; b.style.opacity='0.4'; });
-        let f = document.getElementById('endFrame');
-        if(f) f.style.display='block';
-    }
-}
-   
     html = f'''
     <style>
     body {{ background: #1a0e0a; margin: 0; font-family: Arial; }}
@@ -298,8 +338,6 @@ async function makeAction(type) {
     @keyframes shakeRight {{ 0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-7px)}} 40%{{transform:translateX(7px)}} }}
     .anim-attack {{ animation: attackLeft 0.32s ease; }}
     .anim-shake {{ animation: shakeRight 0.32s ease; }}
-    
-    /* Панель 10 кнопок внизу в стиле браузерных RPG */
     .potions-bar {{
         display: grid;
         grid-template-columns: repeat(10, 1fr);
@@ -322,19 +360,16 @@ async function makeAction(type) {
         font-weight: bold;
         font-size: 10px;
         cursor: pointer;
-        text-align: center;
     }}
-    .potion-slot:active {{ background: #ff8c00; color: #fff; }}
+    .frame-end {{ border:3px solid gold; background:rgba(0,0,0,0.9); padding:20px; border-radius:14px; margin-top:15px; display:none; text-align:center; color:#fff; }}
     </style>
 
     <div class="fight-wrap">
-      <!-- Здоровье противника -->
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;font-weight:900"><span id="enemyName">{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
         <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.3s"></div></div>
       </div>
 
-      <!-- Арена с персонажами -->
       <div style="background:url(/static/camp.jpg) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:260px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
         <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
           <img id="heroImg" src="/static/barbarian_game_size.png" style="height:160px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);">
@@ -344,24 +379,17 @@ async function makeAction(type) {
         </div>
       </div>
 
-      <!-- Здоровье игрока -->
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span><span id="myHp">{cur_my_hp}</span>/{my_max_hp}</span></div>
         <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="myBar" style="width:{my_per}%;height:100%;background:#2ecc40;transition:width 0.3s"></div></div>
       </div>
 
-      <!-- Кнопки ударов -->
       <div style="display:flex;gap:8px">
-        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:12px;padding:6px;cursor:pointer">
-          <div style="color:#ffb84d;font-weight:900;font-size:12px">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>)</div>
-        </button>
-        <button type="button" onclick="makeAction('super')" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:12px;padding:6px;cursor:pointer">
-          <div style="color:#ff0;font-weight:900;font-size:12px">⚡ СУПЕР</div>
-        </button>
+        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:12px;padding:8px;cursor:pointer;color:#ffb84d;font-weight:900">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>)</button>
+        <button type="button" onclick="makeAction('super')" id="superBtn" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:12px;padding:8px;cursor:pointer;color:#ff0;font-weight:900;opacity:{1 if hit_cnt>=5 else 0.5}">⚡ СУПЕР</button>
         <button type="button" onclick="makeAction('run')" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:6px 12px;font-weight:900;cursor:pointer">БЕГ</button>
       </div>
 
-      <!-- НИЖНЯЯ ПАНЕЛЬ ИЗ 10 КНОПОК (Зелья / Эликсиры / Скиллы) -->
       <div class="potions-bar">
         <div class="potion-slot" onclick="makeAction('potion_1')">🍷1</div>
         <div class="potion-slot" onclick="makeAction('potion_2')">🧪2</div>
@@ -374,62 +402,56 @@ async function makeAction(type) {
         <div class="potion-slot" onclick="makeAction('potion_9')">🟢9</div>
         <div class="potion-slot" onclick="makeAction('potion_10')">🔵10</div>
       </div>
+
+      <div id="endFrame" class="frame-end">
+        <h2 id="endTitle"></h2>
+        <p><a href="/promysel" style="color:gold;border:1px solid gold;padding:8px 15px;border-radius:8px;text-decoration:none">На промысел</a></p>
+      </div>
+      <p id="log" style="text-align:center;color:#ffcc66;min-height:20px"></p>
     </div>
 
     <script>
-    async function makeAction(type) {
-    const hero = document.getElementById('heroImg');
-    const enemy = document.getElementById('enemyImg');
-    
-    // блок если уже конец боя
-    if(document.getElementById('endFrame') && document.getElementById('endFrame').style.display=='block') return;
+    async function makeAction(type) {{
+        const endF = document.getElementById('endFrame');
+        if(endF && endF.style.display=='block') return;
 
-    if(type === 'hit' || type === 'super') {
-        hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
-        enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
-    }
+        const hero = document.getElementById('heroImg');
+        const enemy = document.getElementById('enemyImg');
+        if(type === 'hit' || type === 'super') {{
+            hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
+            enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
+        }}
 
-    let response = await fetch('/fight_battle', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({m: type})
-    });
-
-    let data = await response.json();
-    if(data.status == 'redirect'){ location=data.url; return; }
-
-    // тут твой код обновления ХП (оставь как был)
-
-    if(data.finished){
-        document.querySelectorAll('.potion-slot, button').forEach(b=>{ b.style.pointerEvents='none'; b.style.opacity='0.4'; });
-        let f = document.getElementById('endFrame');
-        if(f) f.style.display='block';
-    }
-}
-        
+        let response = await fetch('/fight_battle', {{
+            method: 'POST',
+            headers: {{'Content-Type': 'application/json'}},
+            body: JSON.stringify({{m: type}})
+        }});
+        let data = await response.json();
         if(data.status === 'redirect') {{
             window.location.href = data.url;
             return;
         }}
 
-        if(data.finished) {{
-            window.location.reload();
-            return;
-        }}
-
-        // Обновляем данные на экране без перезагрузки
         document.getElementById('enHp').innerText = data.enemy_hp;
-        document.getElementById('enBar.style').width = (data.enemy_hp * 100 / data.enemy_max) + '%';
-        
+        document.getElementById('enBar').style.width = (data.enemy_hp * 100 / data.enemy_max) + '%';
         document.getElementById('myHp').innerText = data.my_hp;
         document.getElementById('myBar').style.width = (data.my_hp * 100 / data.my_max) + '%';
-        
         document.getElementById('hitCnt').innerText = data.hit_cnt;
+        document.getElementById('log').innerText = data.last_dmg ? `Ты ${{data.last_dmg}} / Враг ${{data.edmg}}` : '';
+        
+        let sb = document.getElementById('superBtn');
+        if(sb) sb.style.opacity = data.hit_cnt >= 5 ? '1' : '0.5';
+
+        if(data.finished) {{
+            document.querySelectorAll('button, .potion-slot').forEach(b=>{{ b.style.pointerEvents='none'; b.style.opacity='0.4'; }});
+            endF.style.display='block';
+            document.getElementById('endTitle').innerText = data.is_win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ';
+        }}
     }}
     </script>
     '''
-    return render_template_string(html)
-
+    return render_page(html, True)
     html=f'''
     <style>
     @keyframes attackLeft {{0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
