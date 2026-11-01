@@ -281,6 +281,7 @@ def fight_battle():
         hit_cnt = session.get("hit_count", 0)
 
         dmg = 0
+        edmg = 0
         if m == "hit" and cur_my > 0 and cur_en > 0:
             dmg = random.randint(3, 7)
             cur_en = max(0, cur_en - dmg)
@@ -290,7 +291,6 @@ def fight_battle():
             cur_en = max(0, cur_en - dmg)
             hit_cnt = 0
 
-        edmg = 0
         if cur_en > 0 and m in ["hit", "super"]:
             emin, emax = session.get("enemy_dmg", [2,5])
             edmg = random.randint(emin, emax)
@@ -323,14 +323,32 @@ def fight_battle():
             "is_win": cur_en <= 0
         })
 
-    # GET - отдаем страницу
-    return render_template("fight_battle.html",
-        enemy_hp=session.get("enemy_hp", 20),
-        enemy_max=session.get("enemy_max", 20),
-        my_hp=session.get("my_hp", my_max_hp),
-        my_max=my_max_hp,
-        hit_count=session.get("hit_count", 0)
-    )
+    # GET - отдаем страницу через render_page, а не через файл
+    body = f"""
+    <div style='text-align:center;padding:20px;color:#fff'>
+      <h2>Бой: {session.get('enemy_type','враг')}</h2>
+      <p>Враг ХП: <b id='ehp'>{session.get('enemy_hp',20)}</b> / {session.get('enemy_max',20)}</p>
+      <p>Твои ХП: <b id='mhp'>{session.get('my_hp',my_max_hp)}</b> / {my_max_hp}</p>
+      <p>Ударов: <b id='hit'>{session.get('hit_count',0)}</b> / 5</p>
+      <button onclick="hit('hit')">Ударить</button>
+      <button onclick="hit('super')" id='superBtn'>Супер удар</button>
+      <button onclick="hit('run')">Сбежать</button>
+      <p id='log'></p>
+    </div>
+    <script>
+    async function hit(m) {{
+      let r = await fetch('/fight_battle', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{m}})}});
+      let j = await r.json();
+      if(j.status=='redirect'){{ location=j.url; return; }}
+      document.getElementById('ehp').innerText=j.enemy_hp;
+      document.getElementById('mhp').innerText=j.my_hp;
+      document.getElementById('hit').innerText=j.hit_cnt;
+      document.getElementById('log').innerText='Ты нанес '+j.last_dmg+' , получил '+j.edmg;
+      if(j.finished){{ alert(j.is_win ? 'Победа!' : 'Поражение'); location='/promysel'; }}
+    }}
+    </script>
+    """
+    return render_page(body, True)
    
     html = f'''
     <style>
