@@ -323,28 +323,72 @@ def fight_battle():
             "is_win": cur_en <= 0
         })
 
-    # GET - отдаем страницу через render_page, а не через файл
+        enemy = session.get('enemy_type','warrior')
+    # картинка врага — подставь свои пути из /static
+    enemy_img = f"/static/img/{enemy}.png" 
+
     body = f"""
-    <div style='text-align:center;padding:20px;color:#fff'>
-      <h2>Бой: {session.get('enemy_type','враг')}</h2>
-      <p>Враг ХП: <b id='ehp'>{session.get('enemy_hp',20)}</b> / {session.get('enemy_max',20)}</p>
-      <p>Твои ХП: <b id='mhp'>{session.get('my_hp',my_max_hp)}</b> / {my_max_hp}</p>
-      <p>Ударов: <b id='hit'>{session.get('hit_count',0)}</b> / 5</p>
-      <button onclick="hit('hit')">Ударить</button>
-      <button onclick="hit('super')" id='superBtn'>Супер удар</button>
-      <button onclick="hit('run')">Сбежать</button>
+    <style>
+      .battle-wrap {{ max-width:700px; margin:20px auto; background:rgba(0,0,0,0.7); border:3px solid #c9a45c; border-radius:16px; padding:20px; box-shadow:0 0 20px #000; color:#fff; text-align:center; }}
+      .hp-bar {{ height:18px; background:#222; border-radius:10px; overflow:hidden; border:1px solid #555; margin:5px 0 15px 0; }}
+      .hp-fill {{ height:100%; transition: width 0.4s; }}
+      .enemy-img {{ width:220px; height:220px; object-fit:contain; margin:10px auto; display:block; filter: drop-shadow(0 0 10px rgba(255,0,0,0.5)); }}
+      .btns button {{ background:linear-gradient(#8a5a2b,#5a2f10); border:2px solid #c9a45c; color:#fff; padding:10px 18px; margin:5px; border-radius:10px; font-weight:bold; cursor:pointer; }}
+      .btns button:hover {{ filter:brightness(1.2); }}
+      #log {{ margin-top:15px; min-height:24px; color:#ffcc66; font-weight:bold; }}
+      .frame-end {{ border:2px solid #c9a45c; padding:15px; border-radius:12px; margin-top:15px; background:rgba(201,164,92,0.15); display:none; }}
+    </style>
+    <div class='battle-wrap'>
+      <h2 style='margin:0;color:#ffdb8a'>Бой: {enemy}</h2>
+      <img src='{enemy_img}' class='enemy-img' onerror="this.src='/static/warrior.png'">
+      
+      <div style='display:flex; justify-content:space-between; gap:20px; text-align:left'>
+        <div style='flex:1'>
+          <div>Враг: <b id='ehp-text'>{session.get('enemy_hp',20)}/{session.get('enemy_max',20)}</b></div>
+          <div class='hp-bar'><div id='ehp-bar' class='hp-fill' style='width:{session.get('enemy_hp',20)/session.get('enemy_max',20)*100}%; background:linear-gradient(90deg,#ff3b3b,#8b0000)'></div></div>
+        </div>
+        <div style='flex:1'>
+          <div>Ты: <b id='mhp-text'>{session.get('my_hp',my_max_hp)}/{my_max_hp}</b></div>
+          <div class='hp-bar'><div id='mhp-bar' class='hp-fill' style='width:{session.get('my_hp',my_max_hp)/my_max_hp*100}%; background:linear-gradient(90deg,#3bff5a,#006b12)'></div></div>
+        </div>
+      </div>
+
+      <p>Комбо: <b id='hit' style='color:#ffd700'>{session.get('hit_count',0)}</b> / 5 для супер-удара</p>
+      
+      <div class='btns'>
+        <button onclick="hit('hit')">⚔️ Ударить</button>
+        <button onclick="hit('super')" id='superBtn' style='opacity:0.5'>💥 Супер удар</button>
+        <button onclick="hit('run')">🏃 Сбежать</button>
+      </div>
+      
       <p id='log'></p>
+      
+      <div id='endFrame' class='frame-end'>
+        <h3 id='endTitle'></h3>
+        <a href='/promysel' style='color:#ffd700'>Вернуться на промысел</a>
+      </div>
     </div>
+
     <script>
-    async function hit(m) {{
+    function updBars(j){{
+      document.getElementById('ehp-text').innerText=j.enemy_hp+'/{session.get('enemy_max',20)}';
+      document.getElementById('mhp-text').innerText=j.my_hp+'/{my_max_hp}';
+      document.getElementById('ehp-bar').style.width=(j.enemy_hp/{session.get('enemy_max',20)}*100)+'%';
+      document.getElementById('mhp-bar').style.width=(j.my_hp/{my_max_hp}*100)+'%';
+      document.getElementById('hit').innerText=j.hit_cnt;
+      let sb=document.getElementById('superBtn');
+      sb.style.opacity=j.hit_cnt>=5 ? '1' : '0.5';
+      document.getElementById('log').innerText=j.last_dmg>0 ? `Ты нанес ${{j.last_dmg}}, получил ${{j.edmg}}` : '';
+    }}
+    async function hit(m){{
       let r = await fetch('/fight_battle', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{m}})}});
       let j = await r.json();
       if(j.status=='redirect'){{ location=j.url; return; }}
-      document.getElementById('ehp').innerText=j.enemy_hp;
-      document.getElementById('mhp').innerText=j.my_hp;
-      document.getElementById('hit').innerText=j.hit_cnt;
-      document.getElementById('log').innerText='Ты нанес '+j.last_dmg+' , получил '+j.edmg;
-      if(j.finished){{ alert(j.is_win ? 'Победа!' : 'Поражение'); location='/promysel'; }}
+      updBars(j);
+      if(j.finished){{
+        document.getElementById('endFrame').style.display='block';
+        document.getElementById('endTitle').innerText=j.is_win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ';
+      }}
     }}
     </script>
     """
