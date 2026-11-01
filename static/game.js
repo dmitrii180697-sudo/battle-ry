@@ -1,17 +1,30 @@
 let isAnimating = false;
 
+// Предзагружаем кадры чтобы не было белого мигания
+const HERO_FRAMES = {
+  idle: '/static/barbarian_idle.webp',
+  raise: '/static/anim_raise.png',
+  hit: '/static/anim_hit.png'
+};
+Object.values(HERO_FRAMES).forEach(src => {
+  const img = new Image();
+  img.src = src;
+});
+
 function findHeroImg(){
-    let hero = null;
-    document.querySelectorAll('img').forEach(img=>{
-        if(img.src.includes('barbarian') || img.src.includes('anim_')) hero = img;
-    });
+    // Ищем по id, потом по классу, в конце уже по src
+    let hero = document.getElementById('hero') || document.querySelector('.hero-img');
     if(hero) return hero;
-    let all = document.querySelectorAll('img');
-    return all.length ? all[all.length-1] : null;
+    
+    let found = null;
+    document.querySelectorAll('img').forEach(img=>{
+        if(img.src.includes('barbarian') || img.src.includes('anim_')) found = img;
+    });
+    return found;
 }
 
 function playHitAndThenSubmit(form, move){
-    if(isAnimating) return;
+    if(isAnimating) return; // было rleturn
     const hero = findHeroImg();
     if(!hero){
         form.submit();
@@ -19,7 +32,7 @@ function playHitAndThenSubmit(form, move){
     }
     isAnimating = true;
     
-    // ВАЖНО: подкладываем m, чтобы app.py увидел удар
+    // подкладываем m, чтобы app.py увидел удар
     let mInput = form.querySelector('input[name="m"]');
     if(!mInput){
         mInput = document.createElement('input');
@@ -29,9 +42,13 @@ function playHitAndThenSubmit(form, move){
     }
     mInput.value = move;
 
-    hero.src = '/static/anim_raise.png';
+    // Убираем все CSS анимации которые давали дергание
+    hero.style.animation = 'none';
+    hero.style.transform = 'none';
+
+    hero.src = HERO_FRAMES.raise;
     setTimeout(()=>{
-        hero.src = '/static/anim_hit.png';
+        hero.src = HERO_FRAMES.hit;
         setTimeout(()=>{
             isAnimating = false;
             form.submit();
@@ -46,13 +63,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
             let move = mInput ? mInput.value : (e.submitter ? e.submitter.value : '');
             move = (move || '').toLowerCase();
             
-            if(move.includes('hit') || move.includes('удар')){
+            if(move.includes('hit') || move.includes('удар') || move.includes('super')){
                 e.preventDefault();
-                playHitAndThenSubmit(form, 'hit');
-            }
-            if(move.includes('super')){
-                e.preventDefault();
-                playHitAndThenSubmit(form, 'super');
+                let finalMove = move.includes('super') ? 'super' : 'hit';
+                playHitAndThenSubmit(form, finalMove);
             }
         });
     });
