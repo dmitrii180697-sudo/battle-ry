@@ -260,132 +260,35 @@ def fight(monster):
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET", "POST"])
-def fight_battle():
-    if "uid" not in session:
-        return redirect("/")
-    if "enemy_hp" not in session:
-        return redirect("/promysel")
-
-    p = get_player(session["uid"])
-    lvl, my_max_hp, rubin, gold, silver = vals(p)
-
-    if request.method == "POST":
-        data = request.get_json(silent=True) or {}
-        m = data.get("m") or request.form.get("m", "hit")
-
-        if m == "run":
-            return jsonify({"status": "redirect", "url": "/promysel"})
-
-        cur_my = session.get("my_hp", my_max_hp)
-        cur_en = session.get("enemy_hp", 20)
-        hit_cnt = session.get("hit_count", 0)
-        dmg = 0
-        edmg = 0
-
-        if m == "hit" and cur_my > 0 and cur_en > 0:
-            dmg = random.randint(3, 7)
-            cur_en = max(0, cur_en - dmg)
-            hit_cnt += 1
-        elif m == "super" and hit_cnt >= 5:
-            dmg = random.randint(10, 18)
-            cur_en = max(0, cur_en - dmg)
-            hit_cnt = 0
-
-        if cur_en > 0 and m in ["hit", "super"]:
-            emin, emax = session.get("enemy_dmg", [2,5])
-            edmg = random.randint(emin, emax)
-            cur_my = max(0, cur_my - edmg)
-
-        session["enemy_hp"] = cur_en
-        session["my_hp"] = cur_my
-        session["hit_count"] = hit_cnt
-        session.modified = True
-
-        finished = False
-        if cur_en <= 0 and not session.get("rewarded"):
-            add_win(session["uid"])
-            session["rewarded"] = True
-            finished = True
-        if cur_my <= 0 and not session.get("rewarded"):
-            add_loss(session["uid"])
-            session["rewarded"] = True
-            finished = True
-
-        return jsonify({
-            "enemy_hp": cur_en,
-            "enemy_max": session.get("enemy_max", 20),
-            "my_hp": cur_my,
-            "my_max": my_max_hp,
-            "hit_cnt": hit_cnt,
-            "last_dmg": dmg,
-            "edmg": edmg,
-            "finished": finished,
-            "is_win": cur_en <= 0
-        })
-
-    enemy = session.get('enemy_type','warrior')
-    # если есть разные мобы, подставим картинку
-    enemy_file = "ent_warrior.png" if "warrior" in enemy.lower() else "wolf_left.png"
+async function makeAction(type) {
+    const hero = document.getElementById('heroImg');
+    const enemy = document.getElementById('enemyImg');
     
-    body = f"""
-    <style>
-      .battle-wrap {{ max-width:720px; margin:15px auto; background: url('/static/bg.jpg') center/cover; background-color:#1a1a1a; border:3px solid #c9a45c; border-radius:18px; padding:20px; color:#fff; text-align:center; box-shadow:0 0 25px #000; }}
-      .inner {{ background:rgba(0,0,0,0.75); border-radius:14px; padding:15px; border:1px solid #5a3d1a; }}
-      .hp-bar {{ height:16px; background:#222; border-radius:8px; overflow:hidden; border:1px solid #666; }}
-      .hp-fill {{ height:100%; transition:width 0.3s; }}
-      .enemy-img {{ width:240px; margin:0 auto; display:block; }}
-      .btns button {{ background: url('/static/word_normal.png') center/cover; background-color:#5a2f10; border:2px solid #c9a45c; color:#fff; padding:10px 18px; margin:6px; border-radius:10px; font-weight:bold; cursor:pointer; min-width:130px; }}
-      .btns button#superBtn {{ background: url('/static/word_super.png') center/cover; }}
-      .frame-end {{ border:3px solid #ffd700; background:rgba(0,0,0,0.85); padding:20px; border-radius:14px; margin-top:20px; display:none; }}
-    </style>
-    <div class='battle-wrap'>
-      <div class='inner'>
-        <h2 style='color:#ffdb8a;margin:0 0 10px 0;'>Бой: {enemy}</h2>
-        <img src='/static/{enemy_file}' class='enemy-img' onerror="this.src='/static/ent_warrior.png'">
-        
-        <div style='display:flex; gap:15px; text-align:left; margin-top:15px;'>
-          <div style='flex:1'>Враг: <b id='ehp'>{session.get('enemy_hp',20)}/{session.get('enemy_max',20)}</b><div class='hp-bar'><div id='ehp-bar' class='hp-fill' style='width:{session.get('enemy_hp',20)/session.get('enemy_max',20)*100}%; background:#ff3b3b'></div></div></div>
-          <div style='flex:1'>Ты: <b id='mhp'>{session.get('my_hp',my_max_hp)}/{my_max_hp}</b><div class='hp-bar'><div id='mhp-bar' class='hp-fill' style='width:{session.get('my_hp',my_max_hp)/my_max_hp*100}%; background:#3bff5a'></div></div></div>
-        </div>
+    // блок если уже конец боя
+    if(document.getElementById('endFrame') && document.getElementById('endFrame').style.display=='block') return;
 
-        <p>Ударов: <b id='hit' style='color:#ffd700'>{session.get('hit_count',0)}</b> / 5</p>
-        <div class='btns'>
-          <button onclick="hit('hit')">Ударить</button>
-          <button onclick="hit('super')" id='superBtn'>Супер удар</button>
-          <button onclick="hit('run')">Сбежать</button>
-        </div>
-        <p id='log' style='color:#ffcc66; min-height:20px;'></p>
+    if(type === 'hit' || type === 'super') {
+        hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
+        enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
+    }
 
-        <div id='endFrame' class='frame-end'>
-          <h2 id='endTitle' style='margin:0'></h2>
-          <p style='margin:10px 0'><a href='/promysel' style='color:#ffd700; font-size:18px; text-decoration:none; border:1px solid #ffd700; padding:8px 15px; border-radius:8px;'>На промысел</a></p>
-        </div>
-      </div>
-    </div>
-    <script>
-    function upd(j){{
-      document.getElementById('ehp').innerText=j.enemy_hp+'/'+j.enemy_max;
-      document.getElementById('mhp').innerText=j.my_hp+'/'+j.my_max;
-      document.getElementById('ehp-bar').style.width=(j.enemy_hp/j.enemy_max*100)+'%';
-      document.getElementById('mhp-bar').style.width=(j.my_hp/j.my_max*100)+'%';
-      document.getElementById('hit').innerText=j.hit_cnt;
-      document.getElementById('superBtn').style.opacity=j.hit_cnt>=5?'1':'0.4';
-      document.getElementById('log').innerText=j.last_dmg?`Ты на ${{j.last_dmg}} / Враг на ${{j.edmg}}`:'';
-    }}
-    async function hit(m){{
-      let r=await fetch('/fight_battle',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{m}})}});
-      let j=await r.json();
-      if(j.status=='redirect'){{location=j.url; return;}}
-      upd(j);
-      if(j.finished){{
-        let f=document.getElementById('endFrame');
-        f.style.display='block';
-        document.getElementById('endTitle').innerText=j.is_win?'🏆 ПОБЕДА!':'💀 ПОРАЖЕНИЕ';
-      }}
-    }}
-    </script>
-    """
-    return render_page(body, True)
+    let response = await fetch('/fight_battle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({m: type})
+    });
+
+    let data = await response.json();
+    if(data.status == 'redirect'){ location=data.url; return; }
+
+    // тут твой код обновления ХП (оставь как был)
+
+    if(data.finished){
+        document.querySelectorAll('.potion-slot, button').forEach(b=>{ b.style.pointerEvents='none'; b.style.opacity='0.4'; });
+        let f = document.getElementById('endFrame');
+        if(f) f.style.display='block';
+    }
+}
    
     html = f'''
     <style>
