@@ -1,73 +1,58 @@
 let isAnimating = false;
 
-// Предзагружаем кадры чтобы не было белого мигания
 const HERO_FRAMES = {
   idle: '/static/barbarian_idle.webp',
   raise: '/static/anim_raise.png',
   hit: '/static/anim_hit.png'
 };
 Object.values(HERO_FRAMES).forEach(src => {
-  const img = new Image();
-  img.src = src;
+  const img = new Image(); img.src = src;
 });
 
 function findHeroImg(){
-    // Ищем по id, потом по классу, в конце уже по src
-    let hero = document.getElementById('hero') || document.querySelector('.hero-img');
-    if(hero) return hero;
-    
-    let found = null;
-    document.querySelectorAll('img').forEach(img=>{
-        if(img.src.includes('barbarian') || img.src.includes('anim_')) found = img;
-    });
-    return found;
+  return document.getElementById('hero') || document.getElementById('heroImg') || document.querySelector('.hero-img');
 }
 
 function playHitAndThenSubmit(form, move){
-    if(isAnimating) return; // было rleturn
-    const hero = findHeroImg();
-    if(!hero){
-        form.submit();
-        return;
-    }
-    isAnimating = true;
-    
-    // подкладываем m, чтобы app.py увидел удар
-    let mInput = form.querySelector('input[name="m"]');
-    if(!mInput){
-        mInput = document.createElement('input');
-        mInput.type='hidden';
-        mInput.name='m';
-        form.appendChild(mInput);
-    }
-    mInput.value = move;
+  if(isAnimating) return;
+  const hero = findHeroImg();
+  const enemy = document.getElementById('enemy') || document.getElementById('enemyImg');
+  isAnimating = true;
 
-    // Убираем все CSS анимации которые давали дергание
-    hero.style.animation = 'none';
-    hero.style.transform = 'none';
+  let mInput = form.querySelector('input[name="m"]');
+  if(!mInput){
+    mInput = document.createElement('input');
+    mInput.type='hidden'; mInput.name='m';
+    form.appendChild(mInput);
+  }
+  mInput.value = move;
 
-    hero.src = HERO_FRAMES.raise;
+  if(hero){
+    hero.style.animation='none'; void hero.offsetWidth;
+    hero.style.animation='attackLeft 0.35s ease';
+  }
+  if(enemy){
     setTimeout(()=>{
-        hero.src = HERO_FRAMES.hit;
-        setTimeout(()=>{
-            isAnimating = false;
-            form.submit();
-        }, 450);
-    }, 200);
+      enemy.style.animation='none'; void enemy.offsetWidth;
+      enemy.style.animation='shakeRight 0.35s ease';
+    },180);
+  }
+
+  setTimeout(()=>{
+    isAnimating=false;
+    form.submit();
+  },500);
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{
-    document.querySelectorAll('form').forEach(form=>{
-        form.addEventListener('submit', (e)=>{
-            let mInput = form.querySelector('input[name="m"]');
-            let move = mInput ? mInput.value : (e.submitter ? e.submitter.value : '');
-            move = (move || '').toLowerCase();
-            
-            if(move.includes('hit') || move.includes('удар') || move.includes('super')){
-                e.preventDefault();
-                let finalMove = move.includes('super') ? 'super' : 'hit';
-                playHitAndThenSubmit(form, finalMove);
-            }
-        });
+  document.querySelectorAll('form').forEach(form=>{
+    form.addEventListener('submit', (e)=>{
+      const btn = document.activeElement;
+      let move = btn && btn.value ? btn.value : 'hit';
+      if(move !== 'hit' && move !== 'super' && !move.includes('super')) move = 'hit';
+      let finalMove = move.includes('super') ? 'super' : 'hit';
+      e.preventDefault();
+      playHitAndThenSubmit(form, finalMove);
     });
+  });
 });

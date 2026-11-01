@@ -273,49 +273,41 @@ def fight_battle():
     p = get_player(session["uid"])
     lvl, my_max_hp, rubin, gold, silver = vals(p)
     
-    # Обработка AJAX запроса во время боя (без перезагрузки страницы)
     if request.is_json:
         data = request.get_json()
         m = data.get("m")
         
         if m == "run":
-            return {"status": "redirect", "url": "/promysel"}
+            return jsonify({"status": "redirect", "url": "/promysel"})
             
         cur_my_hp = session.get("my_hp", my_max_hp)
         cur_enemy_hp = session.get("enemy_hp", 20)
-        
-        # Действие игрока
+        last_dmg = 0
+        edmg = 0
         log_msg = ""
+
         if m == "hit" and cur_my_hp > 0 and cur_enemy_hp > 0:
-            dmg = random.randint(3, 7)
+            dmg = random.randint(22, 38)
             cur_enemy_hp = max(0, cur_enemy_hp - dmg)
             session["enemy_hp"] = cur_enemy_hp
             session["hit_count"] = session.get("hit_count", 0) + 1
-            log_msg = f"Вы нанесли противнику {dmg урона."
+            log_msg = f"Вы нанесли {dmg} урона"
             last_dmg = dmg
-            last_who = "enemy"
             
         elif m == "super" and session.get("hit_count", 0) >= 5 and cur_my_hp > 0 and cur_enemy_hp > 0:
-            dmg = random.randint(10, 18)
+            dmg = random.randint(40, 65)
             cur_enemy_hp = max(0, cur_enemy_hp - dmg)
             session["enemy_hp"] = cur_enemy_hp
             session["hit_count"] = 0
-            log_msg = f"Супер-удар! Вы нанесли {dmg} урона!"
+            log_msg = f"Супер-удар! {dmg} урона!"
             last_dmg = dmg
-            last_who = "enemy"
             
-        # Если слот зелья (например, от 1 до 10)
         elif str(m).startswith("potion_"):
-            # Здесь можно прописать логику лечения зельем
             heal = 10
             cur_my_hp = min(my_max_hp, cur_my_hp + heal)
             session["my_hp"] = cur_my_hp
-            log_msg = f"Вы выпили зелье и восстановили {heal} HP!"
-            last_dmg = 0
-            last_who = "player"
+            log_msg = f"Вы выпили зелье +{heal} HP"
 
-        # Ответный удар монстра, если он еще жив
-        edmg = 0
         if cur_enemy_hp > 0 and cur_my_hp > 0 and m in ["hit", "super"]:
             try:
                 emin, emax = session.get("enemy_dmg", [2, 5])
@@ -325,7 +317,6 @@ def fight_battle():
             cur_my_hp = max(0, cur_my_hp - edmg)
             session["my_hp"] = cur_my_hp
 
-        # Проверка на победу / поражение
         finished = False
         if cur_enemy_hp <= 0 and not session.get("rewarded"):
             add_win(session["uid"])
@@ -337,20 +328,20 @@ def fight_battle():
             session["rewarded"] = True
             finished = True
 
-        return {
+        return jsonify({
             "enemy_hp": cur_enemy_hp,
             "enemy_max": session.get("enemy_max", 20),
             "my_hp": cur_my_hp,
             "my_max": my_max_hp,
             "hit_cnt": session.get("hit_count", 0),
-            "last_dmg": last_dmg if 'last_dmg' in locals() else 0,
+            "last_dmg": last_dmg,
             "edmg": edmg,
             "finished": finished,
             "is_win": cur_enemy_hp <= 0,
             "log": log_msg
-        }
+        })
 
-    # Рендер начальной страницы боя
+    # Рендер
     cur_enemy_hp = max(0, session.get("enemy_hp", 0))
     cur_my_hp = max(0, session.get("my_hp", my_max_hp))
     enemy_max_hp = session.get("enemy_max", 20)
@@ -359,7 +350,7 @@ def fight_battle():
     enemy_img = session.get("enemy_img", "ancient_warrior.png")
     enemy_name = session.get("enemy_name", "Древний воин")
     hit_cnt = session.get("hit_count", 0)
-
+   
     html = f'''
     <style>
     body {{ background: #1a0e0a; margin: 0; font-family: Arial; }}
