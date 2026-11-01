@@ -279,9 +279,9 @@ def fight_battle():
         cur_my = session.get("my_hp", my_max_hp)
         cur_en = session.get("enemy_hp", 20)
         hit_cnt = session.get("hit_count", 0)
-
         dmg = 0
         edmg = 0
+
         if m == "hit" and cur_my > 0 and cur_en > 0:
             dmg = random.randint(3, 7)
             cur_en = max(0, cur_en - dmg)
@@ -323,71 +323,64 @@ def fight_battle():
             "is_win": cur_en <= 0
         })
 
-        enemy = session.get('enemy_type','warrior')
-    # картинка врага — подставь свои пути из /static
-    enemy_img = f"/static/img/{enemy}.png" 
-
+    enemy = session.get('enemy_type','warrior')
+    # если есть разные мобы, подставим картинку
+    enemy_file = "ent_warrior.png" if "warrior" in enemy.lower() else "wolf_left.png"
+    
     body = f"""
     <style>
-      .battle-wrap {{ max-width:700px; margin:20px auto; background:rgba(0,0,0,0.7); border:3px solid #c9a45c; border-radius:16px; padding:20px; box-shadow:0 0 20px #000; color:#fff; text-align:center; }}
-      .hp-bar {{ height:18px; background:#222; border-radius:10px; overflow:hidden; border:1px solid #555; margin:5px 0 15px 0; }}
-      .hp-fill {{ height:100%; transition: width 0.4s; }}
-      .enemy-img {{ width:220px; height:220px; object-fit:contain; margin:10px auto; display:block; filter: drop-shadow(0 0 10px rgba(255,0,0,0.5)); }}
-      .btns button {{ background:linear-gradient(#8a5a2b,#5a2f10); border:2px solid #c9a45c; color:#fff; padding:10px 18px; margin:5px; border-radius:10px; font-weight:bold; cursor:pointer; }}
-      .btns button:hover {{ filter:brightness(1.2); }}
-      #log {{ margin-top:15px; min-height:24px; color:#ffcc66; font-weight:bold; }}
-      .frame-end {{ border:2px solid #c9a45c; padding:15px; border-radius:12px; margin-top:15px; background:rgba(201,164,92,0.15); display:none; }}
+      .battle-wrap {{ max-width:720px; margin:15px auto; background: url('/static/bg.jpg') center/cover; background-color:#1a1a1a; border:3px solid #c9a45c; border-radius:18px; padding:20px; color:#fff; text-align:center; box-shadow:0 0 25px #000; }}
+      .inner {{ background:rgba(0,0,0,0.75); border-radius:14px; padding:15px; border:1px solid #5a3d1a; }}
+      .hp-bar {{ height:16px; background:#222; border-radius:8px; overflow:hidden; border:1px solid #666; }}
+      .hp-fill {{ height:100%; transition:width 0.3s; }}
+      .enemy-img {{ width:240px; margin:0 auto; display:block; }}
+      .btns button {{ background: url('/static/word_normal.png') center/cover; background-color:#5a2f10; border:2px solid #c9a45c; color:#fff; padding:10px 18px; margin:6px; border-radius:10px; font-weight:bold; cursor:pointer; min-width:130px; }}
+      .btns button#superBtn {{ background: url('/static/word_super.png') center/cover; }}
+      .frame-end {{ border:3px solid #ffd700; background:rgba(0,0,0,0.85); padding:20px; border-radius:14px; margin-top:20px; display:none; }}
     </style>
     <div class='battle-wrap'>
-      <h2 style='margin:0;color:#ffdb8a'>Бой: {enemy}</h2>
-      <img src='{enemy_img}' class='enemy-img' onerror="this.src='/static/warrior.png'">
-      
-      <div style='display:flex; justify-content:space-between; gap:20px; text-align:left'>
-        <div style='flex:1'>
-          <div>Враг: <b id='ehp-text'>{session.get('enemy_hp',20)}/{session.get('enemy_max',20)}</b></div>
-          <div class='hp-bar'><div id='ehp-bar' class='hp-fill' style='width:{session.get('enemy_hp',20)/session.get('enemy_max',20)*100}%; background:linear-gradient(90deg,#ff3b3b,#8b0000)'></div></div>
+      <div class='inner'>
+        <h2 style='color:#ffdb8a;margin:0 0 10px 0;'>Бой: {enemy}</h2>
+        <img src='/static/{enemy_file}' class='enemy-img' onerror="this.src='/static/ent_warrior.png'">
+        
+        <div style='display:flex; gap:15px; text-align:left; margin-top:15px;'>
+          <div style='flex:1'>Враг: <b id='ehp'>{session.get('enemy_hp',20)}/{session.get('enemy_max',20)}</b><div class='hp-bar'><div id='ehp-bar' class='hp-fill' style='width:{session.get('enemy_hp',20)/session.get('enemy_max',20)*100}%; background:#ff3b3b'></div></div></div>
+          <div style='flex:1'>Ты: <b id='mhp'>{session.get('my_hp',my_max_hp)}/{my_max_hp}</b><div class='hp-bar'><div id='mhp-bar' class='hp-fill' style='width:{session.get('my_hp',my_max_hp)/my_max_hp*100}%; background:#3bff5a'></div></div></div>
         </div>
-        <div style='flex:1'>
-          <div>Ты: <b id='mhp-text'>{session.get('my_hp',my_max_hp)}/{my_max_hp}</b></div>
-          <div class='hp-bar'><div id='mhp-bar' class='hp-fill' style='width:{session.get('my_hp',my_max_hp)/my_max_hp*100}%; background:linear-gradient(90deg,#3bff5a,#006b12)'></div></div>
-        </div>
-      </div>
 
-      <p>Комбо: <b id='hit' style='color:#ffd700'>{session.get('hit_count',0)}</b> / 5 для супер-удара</p>
-      
-      <div class='btns'>
-        <button onclick="hit('hit')">⚔️ Ударить</button>
-        <button onclick="hit('super')" id='superBtn' style='opacity:0.5'>💥 Супер удар</button>
-        <button onclick="hit('run')">🏃 Сбежать</button>
-      </div>
-      
-      <p id='log'></p>
-      
-      <div id='endFrame' class='frame-end'>
-        <h3 id='endTitle'></h3>
-        <a href='/promysel' style='color:#ffd700'>Вернуться на промысел</a>
+        <p>Ударов: <b id='hit' style='color:#ffd700'>{session.get('hit_count',0)}</b> / 5</p>
+        <div class='btns'>
+          <button onclick="hit('hit')">Ударить</button>
+          <button onclick="hit('super')" id='superBtn'>Супер удар</button>
+          <button onclick="hit('run')">Сбежать</button>
+        </div>
+        <p id='log' style='color:#ffcc66; min-height:20px;'></p>
+
+        <div id='endFrame' class='frame-end'>
+          <h2 id='endTitle' style='margin:0'></h2>
+          <p style='margin:10px 0'><a href='/promysel' style='color:#ffd700; font-size:18px; text-decoration:none; border:1px solid #ffd700; padding:8px 15px; border-radius:8px;'>На промысел</a></p>
+        </div>
       </div>
     </div>
-
     <script>
-    function updBars(j){{
-      document.getElementById('ehp-text').innerText=j.enemy_hp+'/{session.get('enemy_max',20)}';
-      document.getElementById('mhp-text').innerText=j.my_hp+'/{my_max_hp}';
-      document.getElementById('ehp-bar').style.width=(j.enemy_hp/{session.get('enemy_max',20)}*100)+'%';
-      document.getElementById('mhp-bar').style.width=(j.my_hp/{my_max_hp}*100)+'%';
+    function upd(j){{
+      document.getElementById('ehp').innerText=j.enemy_hp+'/'+j.enemy_max;
+      document.getElementById('mhp').innerText=j.my_hp+'/'+j.my_max;
+      document.getElementById('ehp-bar').style.width=(j.enemy_hp/j.enemy_max*100)+'%';
+      document.getElementById('mhp-bar').style.width=(j.my_hp/j.my_max*100)+'%';
       document.getElementById('hit').innerText=j.hit_cnt;
-      let sb=document.getElementById('superBtn');
-      sb.style.opacity=j.hit_cnt>=5 ? '1' : '0.5';
-      document.getElementById('log').innerText=j.last_dmg>0 ? `Ты нанес ${{j.last_dmg}}, получил ${{j.edmg}}` : '';
+      document.getElementById('superBtn').style.opacity=j.hit_cnt>=5?'1':'0.4';
+      document.getElementById('log').innerText=j.last_dmg?`Ты на ${{j.last_dmg}} / Враг на ${{j.edmg}}`:'';
     }}
     async function hit(m){{
-      let r = await fetch('/fight_battle', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body: JSON.stringify({{m}})}});
-      let j = await r.json();
-      if(j.status=='redirect'){{ location=j.url; return; }}
-      updBars(j);
+      let r=await fetch('/fight_battle',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{m}})}});
+      let j=await r.json();
+      if(j.status=='redirect'){{location=j.url; return;}}
+      upd(j);
       if(j.finished){{
-        document.getElementById('endFrame').style.display='block';
-        document.getElementById('endTitle').innerText=j.is_win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ';
+        let f=document.getElementById('endFrame');
+        f.style.display='block';
+        document.getElementById('endTitle').innerText=j.is_win?'🏆 ПОБЕДА!':'💀 ПОРАЖЕНИЕ';
       }}
     }}
     </script>
