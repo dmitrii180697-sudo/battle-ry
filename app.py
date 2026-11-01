@@ -267,26 +267,29 @@ def fight_battle():
         return redirect("/")
     if "enemy_hp" not in session:
         return redirect("/promysel")
-    if "hit_count" not in session:
-        session["hit_count"]=0
+    
+    session.setdefault("hit_count", 0)
 
     if request.method=="POST":
         m=request.form.get("m")
         if m=="run":
             return redirect("/promysel")
-        if m=="hit" and session["my_hp"]>0 and session["enemy_hp"]>0:
-            dmg=random.randint(3,7)
+            
+        if m in ["hit", "super"] and session["my_hp"]>0 and session["enemy_hp"]>0:
+            if m=="hit":
+                dmg=random.randint(3,7)
+                session["hit_count"]=session.get("hit_count",0)+1
+            else: # super
+                if session.get("hit_count",0) < 5:
+                    return redirect("/fight_battle")
+                dmg=random.randint(10,18)
+                session["hit_count"]=0
+            
             session["enemy_hp"]-=dmg
-            session["hit_count"]=session.get("hit_count",0)+1
             session["last_dmg"]=dmg
             session["last_who"]="enemy"
-        if m=="super" and session.get("hit_count",0)>=5:
-            dmg=random.randint(10,18)
-            session["enemy_hp"]-=dmg
-            session["hit_count"]=0
-            session["last_dmg"]=dmg
-            session["last_who"]="enemy"
-        if session["enemy_hp"]>0 and session["my_hp"]>0 and m in ["hit","super"]:
+
+            # Ответка врага
             try:
                 emin,emax=session.get("enemy_dmg",[2,5])
                 ed=random.randint(int(emin),int(emax))
@@ -294,6 +297,7 @@ def fight_battle():
                 ed=random.randint(2,5)
             session["my_hp"]-=ed
             session["last_edmg"]=ed
+
         if session["my_hp"]<=0 and not session.get("rewarded"):
             add_loss(session["uid"])
             session["rewarded"]=True
@@ -301,8 +305,10 @@ def fight_battle():
             add_win(session["uid"])
             add_reward(session["uid"], session.get("reward_g",0), session.get("reward_s",0), session.get("reward_r",0))
             session["rewarded"]=True
+            
         return redirect("/fight_battle")
 
+    # GET часть
     cur_enemy_hp=max(0, session.get("enemy_hp",0))
     cur_my_hp=max(0, session.get("my_hp",0))
     enemy_max_hp=session.get("enemy_max",20)
@@ -312,11 +318,10 @@ def fight_battle():
     enemy_name=session.get("enemy_name","Древний воин")
     hit_cnt=session.get("hit_count",0)
     is_super=hit_cnt>=5
-    camp_bg="camp.jpg"
     super_label="x5 ГОТОВ!" if is_super else f"{hit_cnt}/5"
-    opac=1 if is_super else 0.4
     last_dmg=session.get("last_dmg",0)
 
+    # Этот HTML победы тоже без рамки
     if cur_enemy_hp<=0 or cur_my_hp<=0:
         is_win=cur_enemy_hp<=0
         title="ПОБЕДА!" if is_win else "ПОРАЖЕНИЕ!"
@@ -326,6 +331,14 @@ def fight_battle():
             reward_text=f"<p style='font-weight:900'>+{session.get('reward_g',0)} 🪙 +{session.get('reward_s',0)} ⚪ +{session.get('reward_r',0)} 💎</p>"
         html=f'<div style="min-height:100vh;background:#1a0e0a;display:flex;align-items:center;justify-content:center"><div style="background:#f5e6c0;border:3px solid #5a3e22;border-radius:16px;padding:20px;text-align:center"><h1 style="color:{col}">{title}</h1>{reward_text}<a href="/game" style="display:inline-block;background:#8b5a2b;color:#fff;padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:900;margin-top:10px">В ЛАГЕРЬ</a></div></div>'
         return render_template_string(html)
+
+    return render_template("fight.html", 
+        cur_enemy_hp=cur_enemy_hp, cur_my_hp=cur_my_hp,
+        enemy_per=enemy_per, my_per=my_per,
+        enemy_img=enemy_img, enemy_name=enemy_name,
+        hit_cnt=hit_cnt, is_super=is_super,
+        super_label=super_label, last_dmg=last_dmg
+    )
 
     html=f'''
     <style>
