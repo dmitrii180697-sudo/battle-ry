@@ -1,5 +1,5 @@
 import os, random
-from flask import Flask, request, session, redirect, jsonify, render_template, render_template_string
+from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template, render_template_string
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -324,8 +324,14 @@ def fight_battle():
     enemy_max_hp = session.get("enemy_max", 20)
     cur_my_hp = session.get("my_hp", my_max_hp)
     hit_cnt = session.get("hit_count", 0)
-    enemy_name = session.get("enemy_type", "Воин")
-    enemy_img = session.get("enemy_img", "ent_warrior.png") # если у тебя другое имя, поменяй тут
+    enemy_name = session.get("enemy_type", "Древний Воин")
+    enemy_map = {
+        "warrior": "ancient_warrior.png",
+        "ancient_warrior": "ancient_warrior.png",
+        "wolf": "spirit_wolf_left.png"
+    }
+    raw = session.get("enemy_img", session.get("enemy_type", "warrior"))
+    enemy_img = enemy_map.get(raw, "ancient_warrior.png")
     
     my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0
     enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
