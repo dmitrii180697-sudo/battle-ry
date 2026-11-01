@@ -1,5 +1,5 @@
 import os, random
-from flask import Flask, request, session, redirect, jsonify, render_template
+from flask import Flask, request, session, redirect, jsonify, render_template, render_template_string
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
