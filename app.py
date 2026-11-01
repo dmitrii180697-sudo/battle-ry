@@ -261,25 +261,13 @@ def fight(monster):
     session["log"]=f"Встретил {cfg['name']}!"
     return redirect("/fight_battle")
 
-@app.route("/fight_battle", methods=["GET", "POST"])
-def fight_battle():
-    if "uid" not in session:
-        return redirect("/")
-    if "enemy_hp" not in session:
-        return redirect("/promysel")
-    if "hit_count" not in session:
-        session["hit_count"] = 0
-
-    p = get_player(session["uid"])
-    lvl, my_max_hp, rubin, gold, silver = vals(p)
-    
     if request.is_json:
         data = request.get_json()
         m = data.get("m")
-        
+
         if m == "run":
             return jsonify({"status": "redirect", "url": "/promysel"})
-            
+
         cur_my_hp = session.get("my_hp", my_max_hp)
         cur_enemy_hp = session.get("enemy_hp", 20)
         last_dmg = 0
@@ -293,53 +281,7 @@ def fight_battle():
             session["hit_count"] = session.get("hit_count", 0) + 1
             log_msg = f"Вы нанесли {dmg} урона"
             last_dmg = dmg
-            
-        elif m == "super" and session.get("hit_count", 0) >= 5 and cur_my_hp > 0 and cur_enemy_hp > 0:
-            dmg = random.randint(40, 65)
-            cur_enemy_hp = max(0, cur_enemy_hp - dmg)
-            session["enemy_hp"] = cur_enemy_hp
-            session["hit_count"] = 0
-            log_msg = f"Супер-удар! {dmg} урона!"
-            last_dmg = dmg
-            
-        elif str(m).startswith("potion_"):
-            heal = 10
-            cur_my_hp = min(my_max_hp, cur_my_hp + heal)
-            session["my_hp"] = cur_my_hp
-            log_msg = f"Вы выпили зелье +{heal} HP"
-
-        if cur_enemy_hp > 0 and cur_my_hp > 0 and m in ["hit", "super"]:
-            try:
-                emin, emax = session.get("enemy_dmg", [2, 5])
-                edmg = random.randint(int(emin), int(emax))
-            except:
-                edmg = random.randint(2, 5)
-            cur_my_hp = max(0, cur_my_hp - edmg)
-            session["my_hp"] = cur_my_hp
-
-        finished = False
-        if cur_enemy_hp <= 0 and not session.get("rewarded"):
-            add_win(session["uid"])
-            add_reward(session["uid"], session.get("reward_g", 0), session.get("reward_s", 0), session.get("reward_r", 0))
-            session["rewarded"] = True
-            finished = True
-        elif cur_my_hp <= 0 and not session.get("rewarded"):
-            add_loss(session["uid"])
-            session["rewarded"] = True
-            finished = True
-
-        return jsonify({
-            "enemy_hp": cur_enemy_hp,
-            "enemy_max": session.get("enemy_max", 20),
-            "my_hp": cur_my_hp,
-            "my_max": my_max_hp,
-            "hit_cnt": session.get("hit_count", 0),
-            "last_dmg": last_dmg,
-            "edmg": edmg,
-            "finished": finished,
-            "is_win": cur_enemy_hp <= 0,
-            "log": log_msg
-        })
+            session.modified = True
 
     # Рендер
     cur_enemy_hp = max(0, session.get("enemy_hp", 0))

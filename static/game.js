@@ -1,58 +1,29 @@
-let isAnimating = false;
+async function makeAction(type){
+  if(window.isAnimating) return;
+  window.isAnimating = true;
+  
+  const hero = document.getElementById('heroImg') || document.getElementById('hero');
+  const enemy = document.getElementById('enemyImg') || document.getElementById('enemy');
+  
+  if(hero){ hero.style.animation='none'; void hero.offsetWidth; hero.style.animation='attackLeft 0.32s ease'; }
+  if(enemy){ setTimeout(()=>{ enemy.style.animation='none'; void enemy.offsetWidth; enemy.style.animation='shakeRight 0.32s ease'; },180); }
 
-const HERO_FRAMES = {
-  idle: '/static/barbarian_idle.webp',
-  raise: '/static/anim_raise.png',
-  hit: '/static/anim_hit.png'
-};
-Object.values(HERO_FRAMES).forEach(src => {
-  const img = new Image(); img.src = src;
-});
-
-function findHeroImg(){
-  return document.getElementById('hero') || document.getElementById('heroImg') || document.querySelector('.hero-img');
-}
-
-function playHitAndThenSubmit(form, move){
-  if(isAnimating) return;
-  const hero = findHeroImg();
-  const enemy = document.getElementById('enemy') || document.getElementById('enemyImg');
-  isAnimating = true;
-
-  let mInput = form.querySelector('input[name="m"]');
-  if(!mInput){
-    mInput = document.createElement('input');
-    mInput.type='hidden'; mInput.name='m';
-    form.appendChild(mInput);
-  }
-  mInput.value = move;
-
-  if(hero){
-    hero.style.animation='none'; void hero.offsetWidth;
-    hero.style.animation='attackLeft 0.35s ease';
-  }
-  if(enemy){
-    setTimeout(()=>{
-      enemy.style.animation='none'; void enemy.offsetWidth;
-      enemy.style.animation='shakeRight 0.35s ease';
-    },180);
-  }
-
-  setTimeout(()=>{
-    isAnimating=false;
-    form.submit();
-  },500);
-}
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  document.querySelectorAll('form').forEach(form=>{
-    form.addEventListener('submit', (e)=>{
-      const btn = document.activeElement;
-      let move = btn && btn.value ? btn.value : 'hit';
-      if(move !== 'hit' && move !== 'super' && !move.includes('super')) move = 'hit';
-      let finalMove = move.includes('super') ? 'super' : 'hit';
-      e.preventDefault();
-      playHitAndThenSubmit(form, finalMove);
-    });
+  let resp = await fetch('/fight_battle', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({m: type})
   });
-});
+  let data = await resp.json();
+  
+  if(data.status === 'redirect'){ window.location.href = data.url; return; }
+
+  // ТУТ ОТНИМАЕТ УРОН НА ЭКРАНЕ
+  document.getElementById('enHp').innerText = data.enemy_hp;
+  document.getElementById('enBar').style.width = (data.enemy_hp*100/data.enemy_max)+'%';
+  document.getElementById('myHp').innerText = data.my_hp;
+  document.getElementById('myBar').style.width = (data.my_hp*100/data.my_max)+'%';
+  document.getElementById('hitCnt').innerText = data.hit_cnt;
+
+  window.isAnimating = false;
+  if(data.finished){ setTimeout(()=>{ window.location.reload(); }, 600); }
+}
