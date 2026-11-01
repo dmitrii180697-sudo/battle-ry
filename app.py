@@ -246,17 +246,22 @@ def promysel():
 def fight(monster):
     if "uid" not in session:
         return redirect("/")
+    p = get_player(session["uid"])
+    l,h,r,g,s = vals(p)  # h - твои макс жизни
     # ставим врага
+    cfg = MONSTERS_CFG.get(monster, MONSTERS_CFG["warrior"])
     session["enemy_type"] = monster
-    session["enemy_hp"] = 20
-    session["enemy_max"] = 20
-    session["enemy_dmg"] = [2, 5]
-    session["my_hp"] = session.get("my_hp", 20)
+    session["enemy_hp"] = cfg.get("hp", 20)
+    session["enemy_max"] = cfg.get("hp", 20)
+    session["enemy_dmg"] = cfg.get("dmg", [2,5])
+    session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
+    session["my_hp"] = h  # ВОТ ФИКС - полный хил!
     session["hit_count"] = 0
     session["rewarded"] = False
-    session["reward_g"] = 5
-    session["reward_s"] = 10
-    session["reward_r"] = 0
+    session["reward_g"] = cfg.get("gold", 5)
+    session["reward_s"] = cfg.get("silver", 10)
+    session["reward_r"] = cfg.get("rubin", 0)
+    session.modified = True
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET", "POST"])
