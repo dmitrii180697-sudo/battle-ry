@@ -244,54 +244,93 @@ def promysel():
 
 @app.route("/fight/<monster>")
 def fight(monster):
-    if "uid" not in session: return redirect("/")
-    cfg = MONSTERS_CFG.get(monster, MONSTERS_CFG["warrior"])
-    session["enemy_name"]=cfg["name"]
-    session["enemy_img"]=cfg["img"]
-    session["enemy_hp"]=cfg["hp"]
-    session["enemy_max"]=cfg["hp"]
-    session["enemy_dmg"]=cfg["dmg"]
-    session["reward_g"]=cfg["gold"]
-    session["reward_s"]=cfg["silver"]
-    session["reward_r"]=cfg["rubin"]
-    session["my_hp"]=20
-    session["rewarded"]=False
-    session["hit_count"]=0
-    session["super_used"]=False
-    session["log"]=f"Встретил {cfg['name']}!"
+    if "uid" not in session:
+        return redirect("/")
+    # ставим врага
+    session["enemy_type"] = monster
+    session["enemy_hp"] = 20
+    session["enemy_max"] = 20
+    session["enemy_dmg"] = [2, 5]
+    session["my_hp"] = session.get("my_hp", 20)
+    session["hit_count"] = 0
+    session["rewarded"] = False
+    session["reward_g"] = 5
+    session["reward_s"] = 10
+    session["reward_r"] = 0
     return redirect("/fight_battle")
 
-    if request.is_json:
-        data = request.get_json()
-        m = data.get("m")
+@app.route("/fight_battle", methods=["GET", "POST"])
+def fight_battle():
+    if "uid" not in session:
+        return redirect("/")
+    if "enemy_hp" not in session:
+        return redirect("/promysel")
+
+    p = get_player(session["uid"])
+    lvl, my_max_hp, rubin, gold, silver = vals(p)
+
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        m = data.get("m") or request.form.get("m", "hit")
 
         if m == "run":
             return jsonify({"status": "redirect", "url": "/promysel"})
 
-        cur_my_hp = session.get("my_hp", my_max_hp)
-        cur_enemy_hp = session.get("enemy_hp", 20)
-        last_dmg = 0
+        cur_my = session.get("my_hp", my_max_hp)
+        cur_en = session.get("enemy_hp", 20)
+        hit_cnt = session.get("hit_count", 0)
+
+        dmg = 0
+        if m == "hit" and cur_my > 0 and cur_en > 0:
+            dmg = random.randint(3, 7)
+            cur_en = max(0, cur_en - dmg)
+            hit_cnt += 1
+        elif m == "super" and hit_cnt >= 5:
+            dmg = random.randint(10, 18)
+            cur_en = max(0, cur_en - dmg)
+            hit_cnt = 0
+
         edmg = 0
-        log_msg = ""
+        if cur_en > 0 and m in ["hit", "super"]:
+            emin, emax = session.get("enemy_dmg", [2,5])
+            edmg = random.randint(emin, emax)
+            cur_my = max(0, cur_my - edmg)
 
-        if m == "hit" and cur_my_hp > 0 and cur_enemy_hp > 0:
-            dmg = random.randint(22, 38)
-            cur_enemy_hp = max(0, cur_enemy_hp - dmg)
-            session["enemy_hp"] = cur_enemy_hp
-            session["hit_count"] = session.get("hit_count", 0) + 1
-            log_msg = f"Вы нанесли {dmg} урона"
-            last_dmg = dmg
-            session.modified = True
+        session["enemy_hp"] = cur_en
+        session["my_hp"] = cur_my
+        session["hit_count"] = hit_cnt
+        session.modified = True
 
-    # Рендер
-    cur_enemy_hp = max(0, session.get("enemy_hp", 0))
-    cur_my_hp = max(0, session.get("my_hp", my_max_hp))
-    enemy_max_hp = session.get("enemy_max", 20)
-    enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
-    my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0
-    enemy_img = session.get("enemy_img", "ancient_warrior.png")
-    enemy_name = session.get("enemy_name", "Древний воин")
-    hit_cnt = session.get("hit_count", 0)
+        finished = False
+        if cur_en <= 0 and not session.get("rewarded"):
+            add_win(session["uid"])
+            session["rewarded"] = True
+            finished = True
+        if cur_my <= 0 and not session.get("rewarded"):
+            add_loss(session["uid"])
+            session["rewarded"] = True
+            finished = True
+
+        return jsonify({
+            "enemy_hp": cur_en,
+            "enemy_max": session.get("enemy_max", 20),
+            "my_hp": cur_my,
+            "my_max": my_max_hp,
+            "hit_cnt": hit_cnt,
+            "last_dmg": dmg,
+            "edmg": edmg,
+            "finished": finished,
+            "is_win": cur_en <= 0
+        })
+
+    # GET - отдаем страницу
+    return render_template("fight_battle.html",
+        enemy_hp=session.get("enemy_hp", 20),
+        enemy_max=session.get("enemy_max", 20),
+        my_hp=session.get("my_hp", my_max_hp),
+        my_max=my_max_hp,
+        hit_count=session.get("hit_count", 0)
+    )
    
     html = f'''
     <style>
