@@ -247,15 +247,14 @@ def fight(monster):
     if "uid" not in session:
         return redirect("/")
     p = get_player(session["uid"])
-    l,h,r,g,s = vals(p)  # h - твои макс жизни
-    # ставим врага
+    l,h,r,g,s = vals(p)
     cfg = MONSTERS_CFG.get(monster, MONSTERS_CFG["warrior"])
     session["enemy_type"] = monster
     session["enemy_hp"] = cfg.get("hp", 20)
     session["enemy_max"] = cfg.get("hp", 20)
     session["enemy_dmg"] = cfg.get("dmg", [2,5])
     session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
-    session["my_hp"] = h  # ВОТ ФИКС - полный хил!
+    session["my_hp"] = h
     session["hit_count"] = 0
     session["rewarded"] = False
     session["reward_g"] = cfg.get("gold", 5)
@@ -303,14 +302,17 @@ def fight_battle():
         session.modified = True
 
         finished = False
+        is_win = False
         if cur_en <= 0 and not session.get("rewarded"):
             add_win(session["uid"])
             session["rewarded"] = True
             finished = True
+            is_win = True
         if cur_my <= 0 and not session.get("rewarded"):
             add_loss(session["uid"])
             session["rewarded"] = True
             finished = True
+            is_win = False
 
         return jsonify({
             "enemy_hp": cur_en,
@@ -321,20 +323,18 @@ def fight_battle():
             "last_dmg": dmg,
             "edmg": edmg,
             "finished": finished,
-            "is_win": cur_en <= 0
+            "is_win": is_win,
+            "reward_g": session.get("reward_g", 0),
+            "reward_s": session.get("reward_s", 0),
+            "reward_r": session.get("reward_r", 0),
         })
 
-    # GET - отрисовка боя
     cur_enemy_hp = session.get("enemy_hp", 20)
     enemy_max_hp = session.get("enemy_max", 20)
     cur_my_hp = session.get("my_hp", my_max_hp)
     hit_cnt = session.get("hit_count", 0)
     enemy_name = session.get("enemy_type", "Древний Воин")
-    enemy_map = {
-        "warrior": "ancient_warrior.png",
-        "ancient_warrior": "ancient_warrior.png",
-        "wolf": "spirit_wolf_left.png"
-    }
+    enemy_map = {"warrior": "ancient_warrior.png", "ancient_warrior": "ancient_warrior.png", "wolf": "spirit_wolf_left.png"}
     raw = session.get("enemy_img", session.get("enemy_type", "warrior"))
     enemy_img = enemy_map.get(raw, "ancient_warrior.png")
     
@@ -344,120 +344,71 @@ def fight_battle():
     html = f'''
     <style>
     body {{ background: #1a0e0a; margin: 0; font-family: Arial; }}
-    .fight-wrap {{ max-width: 420px; margin: 0 auto; padding: 10px; box-sizing: border-box; }}
+    .fight-wrap {{ max-width: 420px; margin: 0 auto; padding: 10px; }}
     @keyframes attackLeft {{ 0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
     @keyframes shakeRight {{ 0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-7px)}} 40%{{transform:translateX(7px)}} }}
-    .anim-attack {{ animation: attackLeft 0.32s ease; }}
-    .anim-shake {{ animation: shakeRight 0.32s ease; }}
-    .potions-bar {{
-        display: grid;
-        grid-template-columns: repeat(10, 1fr);
-        gap: 3px;
-        background: #2b1a0e;
-        padding: 6px;
-        border: 2px solid #5a3e22;
-        border-radius: 8px;
-        margin-top: 10px;
-    }}
-    .potion-slot {{
-        background: linear-gradient(#4a3525, #2b1a0e);
-        border: 1px solid #8a6a3d;
-        border-radius: 4px;
-        height: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #ffb84d;
-        font-weight: bold;
-        font-size: 10px;
-        cursor: pointer;
-    }}
-    .frame-end {{ border:3px solid gold; background:rgba(0,0,0,0.9); padding:20px; border-radius:14px; margin-top:15px; display:none; text-align:center; color:#fff; }}
+    .anim-attack {{ animation: attackLeft 0.32s ease; }} .anim-shake {{ animation: shakeRight 0.32s ease; }}
+    .potions-bar {{ display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; background: #2b1a0e; padding: 6px; border: 2px solid #5a3e22; border-radius: 8px; margin-top: 10px; }}
+    .potion-slot {{ background: linear-gradient(#4a3525, #2b1a0e); border: 1px solid #8a6a3d; border-radius: 4px; height: 36px; display: flex; align-items: center; justify-content: center; color: #ffb84d; font-weight: bold; font-size: 10px; cursor: pointer; }}
+    .frame-end {{ border:3px solid gold; background: linear-gradient(#2b1a0e,#1a0e0a); padding:20px; border-radius:16px; margin-top:15px; display:none; text-align:center; color:#fff; box-shadow:0 0 20px gold; }}
     </style>
-
     <div class="fight-wrap">
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
         <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.3s"></div></div>
       </div>
-
-      <div style="background:url(/static/camp.jpg) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:260px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
-        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="heroImg" src="/static/barbarian_game_size.png" style="height:160px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);">
-        </div>
-        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="enemyImg" src="/static/{enemy_img}" style="height:160px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);">
-        </div>
+      <div style="background:url(/static/camp.jpg) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:260px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px">
+        <div style="flex:1;text-align:center"><img id="heroImg" src="/static/barbarian_game_size.png" style="height:160px;filter:drop-shadow(0 4px 12px black);"></div>
+        <div style="flex:1;text-align:center"><img id="enemyImg" src="/static/{enemy_img}" style="height:160px;filter:drop-shadow(0 4px 12px black);"></div>
       </div>
-
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span><span id="myHp">{cur_my_hp}</span>/{my_max_hp}</span></div>
         <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="myBar" style="width:{my_per}%;height:100%;background:#2ecc40;transition:width 0.3s"></div></div>
       </div>
-
       <div style="display:flex;gap:8px">
-        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:12px;padding:8px;cursor:pointer;color:#ffb84d;font-weight:900">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>)</button>
-        <button type="button" onclick="makeAction('super')" id="superBtn" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:12px;padding:8px;cursor:pointer;color:#ff0;font-weight:900;opacity:{1 if hit_cnt>=5 else 0.5}">⚡ СУПЕР</button>
-        <button type="button" onclick="makeAction('run')" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:6px 12px;font-weight:900;cursor:pointer">БЕГ</button>
+        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:12px;padding:8px;color:#ffb84d;font-weight:900">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>)</button>
+        <button type="button" onclick="makeAction('super')" id="superBtn" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:12px;padding:8px;color:#ff0;font-weight:900">⚡ СУПЕР</button>
+        <button type="button" onclick="makeAction('run')" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:6px 12px;font-weight:900">БЕГ</button>
       </div>
-
       <div class="potions-bar">
-        <div class="potion-slot" onclick="makeAction('potion_1')">🍷1</div>
-        <div class="potion-slot" onclick="makeAction('potion_2')">🧪2</div>
-        <div class="potion-slot" onclick="makeAction('potion_3')">📜3</div>
-        <div class="potion-slot" onclick="makeAction('potion_4')">🛡️4</div>
-        <div class="potion-slot" onclick="makeAction('potion_5')">⚡5</div>
-        <div class="potion-slot" onclick="makeAction('potion_6')">🔮6</div>
-        <div class="potion-slot" onclick="makeAction('potion_7')">❤️7</div>
-        <div class="potion-slot" onclick="makeAction('potion_8')">⭐8</div>
-        <div class="potion-slot" onclick="makeAction('potion_9')">🟢9</div>
-        <div class="potion-slot" onclick="makeAction('potion_10')">🔵10</div>
+        <div class="potion-slot">🍷1</div><div class="potion-slot">🧪2</div><div class="potion-slot">📜3</div><div class="potion-slot">🛡️4</div><div class="potion-slot">⚡5</div><div class="potion-slot">🔮6</div><div class="potion-slot">❤️7</div><div class="potion-slot">⭐8</div><div class="potion-slot">🟢9</div><div class="potion-slot">🔵10</div>
       </div>
-
       <div id="endFrame" class="frame-end">
-        <h2 id="endTitle"></h2>
-        <p><a href="/promysel" style="color:gold;border:1px solid gold;padding:8px 15px;border-radius:8px;text-decoration:none">На промысел</a></p>
+        <h2 id="endTitle" style="margin:0 0 10px 0;color:gold"></h2>
+        <div id="trophyBox" style="background:rgba(255,215,0,0.1);border:1px solid #c9a45c;border-radius:10px;padding:10px;margin:10px 0;font-size:14px;line-height:1.6"></div>
+        <a href="/promysel" style="display:inline-block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:10px 25px;border-radius:10px;font-weight:900;text-decoration:none;margin-top:10px">На промысел ➔</a>
       </div>
       <p id="log" style="text-align:center;color:#ffcc66;min-height:20px"></p>
     </div>
-
     <script>
     async function makeAction(type) {{
         const endF = document.getElementById('endFrame');
         if(endF && endF.style.display=='block') return;
-
         const hero = document.getElementById('heroImg');
         const enemy = document.getElementById('enemyImg');
         if(type === 'hit' || type === 'super') {{
             hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
             enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
         }}
-
-        let response = await fetch('/fight_battle', {{
-            method: 'POST',
-            headers: {{'Content-Type': 'application/json'}},
-            body: JSON.stringify({{m: type}})
-        }});
-        let data = await response.json();
-        if(data.status === 'redirect') {{
-            window.location.href = data.url;
-            return;
-        }}
-
+        let r = await fetch('/fight_battle', {{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{m:type}})}});
+        let data = await r.json();
+        if(data.status === 'redirect') {{ location.href=data.url; return; }}
         document.getElementById('enHp').innerText = data.enemy_hp;
         document.getElementById('enBar').style.width = (data.enemy_hp * 100 / data.enemy_max) + '%';
         document.getElementById('myHp').innerText = data.my_hp;
         document.getElementById('myBar').style.width = (data.my_hp * 100 / data.my_max) + '%';
         document.getElementById('hitCnt').innerText = data.hit_cnt;
         document.getElementById('log').innerText = data.last_dmg ? `Ты ${{data.last_dmg}} / Враг ${{data.edmg}}` : '';
-        
-        let sb = document.getElementById('superBtn');
-        if(sb) sb.style.opacity = data.hit_cnt >= 5 ? '1' : '0.5';
-
         if(data.finished) {{
             document.querySelectorAll('button, .potion-slot').forEach(b=>{{ b.style.pointerEvents='none'; b.style.opacity='0.4'; }});
             endF.style.display='block';
             document.getElementById('endTitle').innerText = data.is_win ? '🏆 ПОБЕДА!' : '💀 ПОРАЖЕНИЕ';
+            let box = document.getElementById('trophyBox');
+            if(data.is_win) {{
+                box.innerHTML = `Трофеи с монстра:<br>💰 Золото: +${{data.reward_g}}<br>🪙 Серебро: +${{data.reward_s}}<br>${{data.reward_r>0 ? '💎 Рубины: +' + data.reward_r + '<br>' : ''}}✨ Опыт: +10`;
+            }} else {{
+                box.innerHTML = `Ты пал в бою...<br>Попробуй снова, воин!`;
+            }}
         }}
     }}
     </script>
