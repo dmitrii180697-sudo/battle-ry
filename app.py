@@ -211,20 +211,85 @@ def reg():
     html = '<div class="wrap" style="padding:20px"><h2>Регистрация</h2><form method="post"><input name="name" placeholder="Имя" style="width:100%;padding:10px;margin:5px 0" required><input name="login" placeholder="Логин" style="width:100%;padding:10px;margin:5px 0" required><input name="password" type="password" placeholder="Пароль" style="width:100%;padding:10px;margin:5px 0" required><button class="btn-orange">Создать</button></form></div>'
     return render_template_string(BASE_CSS+html)
 
+MAP_HTML = """
+<div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh;background:url('/static/lager.jpg') center/cover">
+<div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;display:flex;gap:10px;align-items:center"><a href="/game" style="color:#fff;text-decoration:none;font-size:24px">←</a><b style="font-size:22px;color:#fff">📍 КАРТА МИРА</b></div>
+<p style="color:#fff;margin:12px 2px">Выбери куда отправиться. Фон главного экрана поменяется.</p>
+<a href="/loc/lager" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #e8c268;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/lager.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🏕️ Лагерь</h3><p style="font-size:13px">Твой дом. Уровень 1+</p></div></a>
+<a href="/loc/zastava" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/zastava.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🛡️ Застава</h3><p style="font-size:13px">Пограничный пост. Уровень 3+</p></div></a>
+<a href="/loc/oboz" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/oboz.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🛒 Обоз / Ярмарка</h3><p style="font-size:13px">Торговцы, магазин и банк.</p></div></a>
+<a href="/game" style="display:block;background:#0a2642;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;margin-top:20px">← ВЕРНУТЬСЯ В ИГРУ</a>
+</div>
+"""
+
+@app.route("/map")
+def map_page():
+    if "uid" not in session: return redirect("/")
+    return render_page(MAP_HTML, True)
+
+@app.route("/loc/<code>")
+def go_loc(code):
+    if "uid" not in session: return redirect("/")
+    alias = {"kremnev":"lager", "gati":"zastava", "yarmarka":"oboz"}
+    real = alias.get(code, code)
+    session["current_loc"] = real
+    return redirect(f"/game?loc={real}")
+
 @app.route("/game")
 def game():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    body = f'<div class="wrap" style="background:#e8d6a8;min-height:100vh;display:flex;flex-direction:column">{top}<div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/static/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><div style="display:flex;gap:8px;padding:10px 10px 0 10px"><a href="/promysel" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">🌲 Промысел</a><a href="/pvp" style="flex:1;background:linear-gradient(#ffb84d,#ff8c00);border:2px solid #5a3e22;border-radius:8px;padding:12px;text-align:center;font-weight:bold;color:#3d2817;text-decoration:none">⚔️ PVP</a></div><div style="padding:10px"><a href="/camp" style="display:block;background:linear-gradient(#ff8c00,#ff7b00);border:2px solid #5a3e22;border-radius:8px;padding:14px;text-align:center;font-weight:bold;font-size:18px;color:#3d2817;text-decoration:none">🏕️ Лагерь</a></div><div style="flex-grow:1"></div></div>'
-    return render_page(body, True)
+    try: exp = int(p.get("exp",0)) if isinstance(p, dict) or hasattr(p,'get') else 0
+    except: exp = 0
+    try: nick = p.get("name","") if isinstance(p, dict) or hasattr(p,'get') else "Воин"
+    except: nick = "Воин"
+    current = request.args.get("loc") or session.get("current_loc") or "lager"
+    bg_map = {"lager":"/static/lager.jpg", "zastava":"/static/zastava.jpg", "oboz":"/static/oboz.jpg", "camp":"/static/camp.jpg"}
+    bg = bg_map.get(current, "/static/lager.jpg")
+    exp_per = min(100, exp % 100)
 
-@app.route("/camp")
-def camp():
-    if "uid" not in session: return redirect("/")
-    p=get_player(session["uid"]); l,h,r,g,s = vals(p)
-    top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    return render_page(top + '<div class="wrap" style="background:#e8d6a8;padding:10px"><div style="margin:8px;background:#3d2817;padding:6px;border-radius:4px"><div style="height:300px;overflow:hidden;border:2px solid #2b1a0e"><img src="/static/camp.jpg" style="width:100%;height:100%;object-fit:cover"></div></div><a href="/game" class="btn-orange">← На карту</a></div>', True)
+    html = f'''
+    <div style="max-width:480px;margin:0 auto;min-height:100vh;background:url({bg}) center/cover no-repeat;display:flex;flex-direction:column;padding:10px;box-sizing:border-box">
+      <div style="background:rgba(8,30,55,.88);border:2px solid #4a7ba6;padding:10px;display:flex;justify-content:space-around;font-weight:900;color:#fff;font-size:20px">
+        <span>💎 {r} +</span><span>🪙 {s} +</span><span>🟡 {g} +</span>
+      </div>
+      <div style="margin-top:8px;background:rgba(8,30,55,.88);border:2px solid #4a7ba6;padding:8px 12px;display:flex;align-items:center;gap:10px;color:#fff">
+        <div style="background:linear-gradient(#e8c268,#9a741f);width:42px;height:48px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;clip-path:polygon(50% 0,100% 20%,100% 80%,50% 100%,0 80%,0 20%)">{l}</div>
+        <div style="flex:1"><div style="font-weight:800">{nick} &nbsp;•&nbsp; {exp}/{100}</div><div style="height:8px;background:#0a1a2a;border-radius:10px;margin-top:4px;overflow:hidden"><div style="width:{exp_per}%;height:100%;background:#7ab8ff"></div></div></div>
+        <a href="/hero" style="font-size:26px;text-decoration:none">⚙️</a>
+      </div>
+
+      <div style="flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:14px 0">
+        <div style="display:flex;flex-direction:column;gap:10px;width:104px">
+          <a href="/top" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🏆<br>Топ игроков</a>
+          <a href="/clan" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">👥<br>Клан</a>
+          <a href="/alliance" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🛡️<br>Альянс</a>
+          <a href="/shop" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">💎<br>Премиум</a>
+          <a href="/bank" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🏛️<br>Банк</a>
+        </div>
+        <div style="flex:1;text-align:center">
+          <a href="/promysel" style="text-decoration:none;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;display:inline-block;min-width:180px"><b style="color:#f5d98a;font-size:20px">Логово монстров</b><br><small>0/100</small><div style="height:8px;background:#0a1a2a;margin-top:8px;border-radius:10px"><div style="height:100%;background:#f5d98a;width:0%"></div></div></div></a>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;width:104px">
+          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">✉️<br>Почта</a>
+          <a href="/quests" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">📰<br>Новости</a>
+          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">👥<br>Онлайн</a>
+          <a href="/logout" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🚪<br>Выход</a>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <a href="/shop" style="flex:1;background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:14px;font-weight:800;font-size:18px">🛒 Магазин</a>
+        <a href="/hero" style="flex:1;background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:14px;font-weight:800;font-size:18px">👤 Персонаж</a>
+      </div>
+      <div style="display:flex;gap:10px;align-items:stretch">
+        <a href="/promysel" style="flex:1;background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:14px;font-weight:800">⛏️<br>Промысел</a>
+        <a href="/map" style="flex:2.2;background:linear-gradient(#1a3a5a,#0a1e35);border:2px solid #e8c268;color:#f5e6b0;text-decoration:none;text-align:center;padding:16px;font-weight:900;font-size:28px">📍 КАРТА</a>
+        <a href="/pvp" style="flex:1;background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:14px;font-weight:800">⚔️<br>PVP</a>
+      </div>
+    </div>
+    '''
+    return render_page(html, False)
 
 @app.route("/promysel")
 def promysel():
@@ -361,7 +426,8 @@ def fight_battle():
     .potion-slot {{ background: linear-gradient(#4a3525, #2b1a0e); border: 1px solid #8a6a3d; border-radius: 4px; height: 36px; display: flex; align-items: center; justify-content: center; color: #ffb84d; font-weight: bold; font-size: 10px; cursor: pointer; }}
     .frame-end {{ border:3px solid gold; background: linear-gradient(#2b1a0e,#1a0e0a); padding:20px; border-radius:16px; margin-top:15px; display:none; text-align:center; color:#fff; box-shadow:0 0 20px gold; }}
     </style>
-    <div class="fight-wrap">
+    <div class="fight-wrap" id="fightWrap">
+<div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:20px"></div>
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
         <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.3s"></div></div>
@@ -408,7 +474,7 @@ if(overlay && overlay.style.display=='flex') return;
         document.getElementById('myHp').innerText = data.my_hp;
         document.getElementById('myBar').style.width = (data.my_hp * 100 / data.my_max) + '%';
         document.getElementById('hitCnt').innerText = data.hit_cnt;
-        document.getElementById('log').innerText = data.last_dmg ? `Ты ${{data.last_dmg}} / Враг ${{data.edmg}}` : '';
+        document.getElementById('log').innerText = data.last_dmg ? Ты ${{data.last_dmg}} / Враг ${{data.edmg}} : '';
         if(data.finished){{
           document.getElementById('fightWrap').style.opacity='0.15';
           document.getElementById('fightWrap').style.pointerEvents='none';
@@ -416,80 +482,14 @@ if(overlay && overlay.style.display=='flex') return;
           document.getElementById('endTitle').innerText=data.is_win?'🏆 ПОБЕДА!':'💀 ПОРАЖЕНИЕ';
           let box=document.getElementById('trophyBox');
           if(data.is_win){{
-            box.innerHTML=`ТРОФЕИ С МОНСТРА<br><br>💰 Золото: <b>+${{data.reward_g}}</b><br>🪙 Серебро: <b>+${{data.reward_s}}</b><br>⭐ Опыт: <b>+10</b>`;
+            box.innerHTML=ТРОФЕИ С МОНСТРА<br><br>💰 Золото: <b>+${{data.reward_g}}</b><br>🪙 Серебро: <b>+${{data.reward_s}}</b><br>⭐ Опыт: <b>+10</b>;
         }}else{{
-          box.innerHTML=`Ты пал в бою...<br>Попробуй снова, воин!`;
+          box.innerHTML=Ты пал в бою...<br>Попробуй снова, воин!;
     }}
 }}
     </script>
     '''
     return render_page(html, True)
-    html=f'''
-    <style>
-    @keyframes attackLeft {{0%{{transform:translateX(0)}} 35%{{transform:translateX(40px)}} 100%{{transform:translateX(0)}} }}
-    @keyframes shakeRight {{0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-7px)}} 40%{{transform:translateX(7px)}} 60%{{transform:translateX(-4px)}} 80%{{transform:translateX(4px)}} }}
-    @keyframes dmgPop {{0%{{transform:translate(-50%,-50%) scale(0); opacity:0}} 20%{{transform:translate(-50%,-90%) scale(1.5); opacity:1}} 100%{{transform:translate(-50%,-140%) scale(1); opacity:0}} }}
-    .anim-attack {{animation:attackLeft 0.32s ease}}
-    .anim-shake {{animation:shakeRight 0.32s ease}}
-    .dmg {{position:absolute;top:45%;left:50%;z-index:10;color:#ffeb00;font-weight:900;font-size:40px;text-shadow:2px 2px 0 #000;opacity:0;pointer-events:none}}
-    .dmg.show {{animation:dmgPop 0.7s ease forwards}}
-    </style>
-
-    <div style="max-width:420px;margin:0 auto;padding:10px">
-      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin-bottom:6px">
-        <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span>{cur_enemy_hp}/{enemy_max_hp}</span></div>
-        <div style="height:8px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{enemy_per}%;height:100%;background:#ff3b30"></div></div>
-      </div>
-
-      <div style="background:url(/static/{camp_bg}) center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:300px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;position:relative;overflow:hidden">
-        <div style="position:absolute;inset:0;background:rgba(255,248,220,0.18);border-radius:13px"></div>
-        
-        <!-- СЛЕВА ТЫ - без scaleX, смотрит вправо -->
-        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="heroImg" src="/static/barbarian_game_size.png?v=5" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);background:transparent">
-        </div>
-        
-        <!-- СПРАВА ВРАГ - без scaleX, смотрит влево -->
-        <div style="flex:1;text-align:center;z-index:2;display:flex;align-items:flex-end;justify-content:center">
-          <img id="enemyImg" src="/static/{enemy_img}?v=5" style="height:190px;max-width:100%;object-fit:contain;filter:drop-shadow(0 4px 12px black);background:transparent">
-        </div>
-
-        <div id="dmgText" class="dmg">-{last_dmg}</div>
-      </div>
-
-      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:5px 10px;margin:8px 0">
-        <div style="display:flex;justify-content:space-between;font-weight:900"><span>ТЫ</span><span>{cur_my_hp}/20</span></div>
-        <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden"><div style="width:{my_per}%;height:100%;background:#2ecc40"></div></div>
-      </div>
-
-      <form id="fightForm" method="post" style="display:flex;gap:8px">
-        <button type="button" onclick="doHit('hit')" style="flex:1;background:#2b1a0e;border:3px solid #ff8c00;border-radius:14px;padding:8px"><img src="/static/sword_normal.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ffb84d;font-weight:900;font-size:11px">УДАР [{hit_cnt}]</div></button>
-        <button type="button" onclick="doHit('super')" style="flex:1;background:#2b1a0e;border:3px solid #ffcc00;border-radius:14px;padding:8px;opacity:{opac}"><img src="/static/sword_super.png" style="width:60px;height:60px;object-fit:contain"><div style="color:#ff0;font-weight:900;font-size:11px">{super_label}</div></button>
-        <button name="m" value="run" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:8px 14px;font-weight:900">БЕГ</button>
-        <input type="hidden" name="m" id="mInput">
-      </form>
-    </div>
-
-    <script>
-    function doHit(type){{
-      if(type=='super' && {hit_cnt} < 5) return;
-      const hero = document.getElementById('heroImg');
-      const enemy = document.getElementById('enemyImg');
-      const dmg = document.getElementById('dmgText');
-      const form = document.getElementById('fightForm');
-      
-      hero.classList.remove('anim-attack'); void hero.offsetWidth; hero.classList.add('anim-attack');
-      enemy.classList.remove('anim-shake'); void enemy.offsetWidth; enemy.classList.add('anim-shake');
-      dmg.classList.remove('show'); void dmg.offsetWidth; dmg.classList.add('show');
-
-      setTimeout(()=>{{
-        document.getElementById('mInput').value = type;
-        form.submit();
-      }}, 320);
-    }}
-    </script>
-    '''
-    return render_template_string(html)
 
 @app.route("/pvp")
 def pvp():
@@ -633,5 +633,5 @@ def admin_page():
     """
     return render_page(html, True)
 
-if __name__=="__main__":
+if game=="main_":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
