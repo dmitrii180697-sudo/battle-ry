@@ -222,6 +222,7 @@ MAP_HTML = """
 <br>
 <a href="/loc/oboz" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛒 Обоз</a>
 <br>
+<a href="/loc/promysel" style="color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🌲 Промысел</a><br><br>
 <a href="/game" style="display:block;background:#0a2642;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold">← ВЕРНУТЬСЯ В ИГРУ</a>
 </div>
 """
@@ -271,7 +272,7 @@ def game():
           <a href="/bank" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🏛️<br>Банк</a>
         </div>
         <div style="flex:1;text-align:center">
-          <a href="/promysel" style="text-decoration:none;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;display:inline-block;min-width:180px"><b style="color:#f5d98a;font-size:20px"></b><br><div id="locName" style="text-align:center;font-size:34px;font-weight:bold;color:#fff;padding:18px 0">Лагерь</div><script>var cur=new URLSearchParams(location.search).get("loc")||"lager";var el=document.getElementById("locName");if(cur=="oboz")el.textContent="🛒 Обоз";else if(cur=="zastava")el.textContent="🛡️ Застава";else el.textContent="🏕️ Лагерь";</script><div style="height:8px;background:#0a1a2a;margin-top:8px;border-radius:10px"><div style="height:100%;background:#f5d98a;width:0%"></div></div></div></a>
+          <a href="/promysel" style="text-decoration:none;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;display:inline-block;min-width:180px"><b style="color:#f5d98a;font-size:20px"></b><br><div id="locName" style="text-align:center;font-size:34px;font-weight:bold;color:#fff;padding:18px 0">Лагерь</div><script>var cur=new URLSearchParams(location.search).get("loc")||"lager";var el=document.getElementById("locName");if(cur=="oboz")el.textContent="🛒 Обоз";else if(cur=="zastava")el.textContent="🛡️ Застава";else if(cur=="promysel")el.textContent="🌲 Промысел";else el.textContent="🏕️ Лагерь";</script><script>var cl=new URLSearchParams(location.search).get("loc")||"lager";if(cl!="promysel"){document.querySelectorAll('a[href="/fight/beast"],a[href="/fight/warrior"]').forEach(function(a){var c=a.closest("div");if(c)c.style.display="none";});}</script><div style="height:8px;background:#0a1a2a;margin-top:8px;border-radius:10px"><div style="height:100%;background:#f5d98a;width:0%"></div></div></div></a>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;width:104px">
           <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">✉️<br>Почта</a>
