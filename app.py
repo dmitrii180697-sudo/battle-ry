@@ -481,7 +481,7 @@ if(overlay && overlay.style.display=='flex') return;
           document.getElementById('endTitle').innerText=data.is_win?'🏆 ПОБЕДА!':'💀 ПОРАЖЕНИЕ';
           let box=document.getElementById('trophyBox');
           if(data.is_win){{
-            box.innerHTML=ТРОФЕИ С МОНСТРА<br><br>💰 Золото: <b>+${{data.reward_g}}</b><br>🪙 Серебро: <b>+${{data.reward_s}}</b><br>⭐ Опыт: <b>+10</b>;
+            box.innerHTML=ТРОФЕИ С МОНСТРА<br><br>💰 Золото: <b>+${{data.reward_g}}</b><br>⚪ Серебро: <b>+${{data.reward_s}}</b><br>⭐ Опыт: <b>+10</b>;
         }}else{{
           box.innerHTML=Ты пал в бою...<br>Попробуй снова, воин!;
     }}
