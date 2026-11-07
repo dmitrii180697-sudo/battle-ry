@@ -212,16 +212,16 @@ def reg():
 
 MAP_HTML = """
 <div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh">
-<div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;display:flex;gap:12px">
+<div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px">
 <p style="color:#fff;margin:12px 2px">📍 КАРТА МИРА</p>
 </div>
 <br>
-<a href="/loc/lager" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #f0c040;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🏕️ Лагерь</a>
+<a href="/loc/lager" style="display:block;background:rgba(8,30,55,.92);border:2px solid #f0c040;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🏕️ Лагерь</a>
 <br>
-<a href="/loc/zastava" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛡️ Застава</a>
+<a href="/loc/zastava" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛡️ Застава</a>
 <br>
-" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛒 Обоз</a>
-<br><a href="/loc/oboz
+<a href="/loc/oboz" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛒 Обоз</a>
+<br>
 <a href="/game" style="display:block;background:#0a2642;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold">← ВЕРНУТЬСЯ В ИГРУ</a>
 </div>
 """
