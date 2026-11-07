@@ -213,10 +213,11 @@ def reg():
 MAP_HTML = """
 <div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh;background:url('/static/lager.jpg') center/cover">
 <div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;display:flex;gap:10px;align-items:center"><a href="/game" style="color:#fff;text-decoration:none;font-size:24px">←</a><b style="font-size:22px;color:#fff">📍 КАРТА МИРА</b></div>
-<p style="color:#fff;margin:12px 2px">Выбери куда отправиться. Фон главного экрана поменяется.</p>
-<a href="/loc/lager" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #e8c268;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/lager.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🏕️ Лагерь</h3><p style="font-size:13px">Твой дом. Уровень 1+</p></div></a>
-<a href="/loc/zastava" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/zastava.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🛡️ Застава</h3><p style="font-size:13px">Пограничный пост. Уровень 3+</p></div></a>
-<a href="/loc/oboz" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/oboz.jpg" style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🛒 Обоз</h3><p style="font-size:13px">Торговцы, магазин и банк.</p></div></a>
+<p style="color:#fff;margin:12px 2px"
+<a href="/loc/lager" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #e8c268;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/lager.jpg" alt="Лагерь воин
+
+<a href="/loc/zastava" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/zastava.jpg" alt="Пограничная застава — сторожевой пост на рубеже игрового мира, где охраняют проход и наблюдают за окрестностями. Настороженная, бдительная атмосфера." style="width:90px;height:90px;object-fit:cover"><div><h3 style="color:#f5d98a">🛡️ Застава</h3><p style="font-size:13px"><p></div></a>
+<a href="/loc/oboz" style="display:flex;gap:12px;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;margin-bottom:12px;text-decoration:none;color:#fff;align-items:center"><img src="/static/oboz.jpg" alt="Торговый обоз в игровом мире — место, где торговцы п
 <a href="/game" style="display:block;background:#0a2642;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;margin-top:20px">← ВЕРНУТЬСЯ В ИГРУ</a>
 </div>
 """
