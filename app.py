@@ -1,3 +1,4 @@
+from curses import longname
 import os, random
 from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template, render_template_string
 import psycopg2
@@ -250,10 +251,14 @@ def game():
     current = request.args.get("loc") or session.get("current_loc") or "lager"
     bg_map = {"lager":"/static/lager.jpg", "zastava":"/static/zastava.jpg", "oboz":"/static/oboz.jpg", "camp":"/static/camp.jpg"}
     bg = bg_map.get(current, "/static/lager.jpg")
+    loc_names = {"lager":"Лагерь","zastava":"Застава","oboz":"Обоз","promysel":"Промысел","camp":"Лагерь"}
+    loc_title = loc_names.get(current, "Лагерь")
+    session["current_loc"] = current
     exp_per = min(100, exp % 100)
 
     html = f'''
     <div style="max-width:480px;margin:0 auto;min-height:100vh;background:url({bg}) center/cover no-repeat;display:flex;flex-direction:column;padding:10px;box-sizing:border-box">
+          <div id="locName" style="background:rgba(8,30,55,.9);border:2px solid #4a7ba6;padding:8px;text-align:center;color:#fff;font-weight:900;font-size:22px">{loc_title}</div>
       <div style="background:rgba(8,30,55,.88);border:2px solid #4a7ba6;padding:10px;display:flex;justify-content:space-around;font-weight:900;color:#fff;font-size:20px">
         <span>💎 {r} +</span><span>🪙 {s} +</span><span>🟡 {g} +</span>
       </div>
