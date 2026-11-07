@@ -267,7 +267,7 @@ def game():
           <a href="/bank" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">🏛️<br>Банк</a>
         </div>
         <div style="flex:1;text-align:center">
-          <a href="/promysel" style="text-decoration:none;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;display:inline-block;min-width:180px"><b style="color:#f5d98a;font-size:20px">Локация</b><br><small>Лагерь</small><div style="height:8px;background:#0a1a2a;margin-top:8px;border-radius:10px"><div style="height:100%;background:#f5d98a;width:0%"></div></div></div></a>
+          <a href="/promysel" style="text-decoration:none;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;display:inline-block;min-width:180px"><b style="color:#f5d98a;font-size:20px"></b><br><small id="locName">Лагерь</small><div style="height:8px;background:#0a1a2a;margin-top:8px;border-radius:10px"><div style="height:100%;background:#f5d98a;width:0%"></div></div></div></a>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;width:104px">
           <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px 4px;font-weight:800">✉️<br>Почта</a>

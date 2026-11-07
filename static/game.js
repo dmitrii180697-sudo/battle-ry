@@ -26,4 +26,9 @@ async function makeAction(type){
 
   window.isAnimating = false;
   if(data.finished){ setTimeout(()=>{ window.location.reload(); }, 600); }
-}
+}// --- МЕНЯЕМ НАЗВАНИЕ ЛОКАЦИИ ---
+const LOCS = {zastava:"Лагерь", oboz:"Обоз"};
+const p = new URLSearchParams(location.search);
+const cur = p.get("loc") || "zastava";
+const el = document.getElementById("locName");
+if (el) el.textContent = LOCS[cur] || "Лагерь";
