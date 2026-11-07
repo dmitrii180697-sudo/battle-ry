@@ -220,9 +220,9 @@ MAP_HTML = """
 <br>
 <a href="/loc/zastava" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛡️ Застава</a>
 <br>
-<a href="/loc/oboz" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛒 Обоз</a>
+<a href="/loc/oboz" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🛒 Обоз</a><br>
 <br>
-<a href="/loc/promysel" style="color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🌲 Промысел</a><br><br>
+<a href="/loc/promysel" style="display:block;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px;text-align:center;color:#fff;text-decoration:none;font-size:20px;font-weight:bold">🌲 Промысел</a><br>
 <a href="/game" style="display:block;background:#0a2642;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold">← ВЕРНУТЬСЯ В ИГРУ</a>
 </div>
 """
