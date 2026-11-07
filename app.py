@@ -145,10 +145,6 @@ function closeMenu(){document.getElementById('bottomSheet').classList.remove('op
 """
 
 MENU_HTML = """
-<div class="bottom-bar">
-  <button onclick="toggleMenu()">☰ Меню</button>
-  <a href="/logout">Выход</a>
-</div>
 <div class="bottom-sheet-overlay" id="sheetOverlay" onclick="closeMenu()"></div>
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle"></div>
