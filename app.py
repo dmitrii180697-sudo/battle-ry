@@ -494,7 +494,7 @@ def fight_battle():
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>ВЫ</span><span><span id="myHp">{cur_my_hp}</span>/{my_max_hp}</span></div>
         <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:4px"><div id="myBar" style="width:{my_per}%;height:100%;background:#2ecc40;transition:width 0.2s"></div></div>
       </div>
-
+      <div id="battleLog" style="background:#1a0e0a;max-height:120px;overflow-y:auto;border:2px solid #5a3e22;border-radius:8px;margin:8px 10px;padding:4px"></div>
       <div style="display:flex;gap:8px">
         <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:2px solid #ff8c00;border-radius:10px;padding:12px;color:#ffb84d;font-weight:900;cursor:pointer">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>/5)</button>
         <button type="button" onclick="makeAction('super')" id="superBtn" style="flex:1;background:#2b1a0e;border:2px solid #ffcc00;border-radius:10px;padding:12px;color:#ff0;font-weight:900;cursor:pointer">⚡ СУПЕР</button>
