@@ -235,9 +235,7 @@ MAP_HTML = """
 <a href="/loc/lager" style="display:block;background:rgba(8,30,55,.92);border:2px solid #f0c040;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:10px">🏕️ Лагерь</a>
 <a href="/loc/zastava" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:10px">🛡️ Застава</a>
 <a href="/loc/oboz" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:10px">🛒 Обоз</a>
-<a href="/loc/promysel" style="display:block;background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:15px">🌲 Промысел</a>
-
-<a href="/game" style="display:block;background:#5a3e22;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;border-radius:8px">← ВЕРНУТЬСЯ В ИГРУ</a>
+<a href="/game" style="display:block;background:#5a3e22;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;border-radius:8px">← Вернуться в игру</a>
 </div>
 """
 
@@ -278,11 +276,12 @@ def game():
         "oboz": "🛒 Обоз"
     }
     loc_title = loc_names.get(current, "🏕️ Лагерь")
+    lvl_exp = max(100, l * 100)
     exp_per = min(100, exp % 100)
 
     html = f'''
     <div style="max-width:480px;margin:0 auto;min-height:100vh;background:url('{bg}') center/cover no-repeat;display:flex;flex-direction:column;padding:10px;box-sizing:border-box">
-      <div style="background:rgba(8,30,55,.9);border:2px solid #4a7ba6;padding:8px;text-align:center;color:#fff;font-weight:900;font-size:22px;border-radius:8px">{loc_title}</div>
+      <div style="background:rgba(8,30,55,.9);border:2px solid #4a7ba6;padding:8px;text-align:center;color:#fff;font-weight:900;font-size:22px;border-radius:8px">BATTLE</div>
       
       <div style="margin-top:8px;background:rgba(8,30,55,.88);border:2px solid #4a7ba6;padding:8px;display:flex;justify-content:space-around;font-weight:900;color:#fff;font-size:18px;border-radius:8px">
         <span>💎 {r}</span><span>🪙 {s}</span><span>🟡 {g}</span>
@@ -291,7 +290,7 @@ def game():
       <div style="margin-top:8px;background:rgba(8,30,55,.88);border:2px solid #4a7ba6;padding:8px 12px;display:flex;align-items:center;gap:10px;color:#fff;border-radius:8px">
         <div style="background:linear-gradient(#e8c268,#9a741f);width:42px;height:48px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;clip-path:polygon(50% 0,100% 20%,100% 80%,50% 100%,0 80%,0 20%)">{l}</div>
         <div style="flex:1">
-          <div style="font-weight:800">{nick} &nbsp;•&nbsp; {exp}/{lvl_exp if 'lvl_exp' in locals() else 100}</div>
+          <div style="font-weight:800">{nick} &nbsp;•&nbsp; {exp}/{lvl_exp}</div>
           <div style="height:8px;background:#0a1a2a;border-radius:10px;margin-top:4px;overflow:hidden">
             <div style="width:{exp_per}%;height:100%;background:#7ab8ff"></div>
           </div>
@@ -315,7 +314,9 @@ def game():
         <div style="display:flex;flex-direction:column;gap:10px;width:104px">
           <a href="/quests" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">📜<br>Квесты</a>
           <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🟢<br>Онлайн</a>
-          <a href="/logout" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🚪<br>Выход</a>
+          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🟢<br>Премиум</a>
+          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🟢<br>Чат</a> 
+          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🟢<br>Выход</a>
         </div>
       </div>
 
