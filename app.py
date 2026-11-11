@@ -1,4 +1,3 @@
-from curses import longname
 import os, random
 from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template_string
 import psycopg2
