@@ -302,6 +302,8 @@ def game():
           <a href="/top" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🏆<br>Топ</a>
           <a href="/clan" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">👥<br>Клан</a>
           <a href="/alliance" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🛡️<br>Альянс</a>
+          <a href="/alliance" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🛡️<br>Магазин</a>
+          <a href="/alliance" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🛡️<br>Почта</a>
         </div>
 
         <div style="flex:1;text-align:center">
