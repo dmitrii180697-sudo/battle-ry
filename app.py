@@ -551,9 +551,9 @@ def fight_battle():
 
             let logEl = document.getElementById('log');
             if (type === 'hit') {{
-                logEl.innerHTML = `Вы нанесли <span style="color:#ff4d4d">-${data.last_dmg}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
+                logEl.innerHTML = `Вы нанесли <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
             }} else if (type === 'super') {{
-                logEl.innerHTML = `🔥 СУПЕРУДАР! Нанесено <span style="color:#ff4d4d">-${data.last_dmg}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
+                logEl.innerHTML = `🔥 СУПЕРУДАР! Нанесено <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
             }}
 
             if (data.finished) {{
