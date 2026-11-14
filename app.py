@@ -587,16 +587,16 @@ function pixiHit(isEnemy, dmg, isSuper){{
             if(data.edmg) pixiHit(false, data.edmg, false);
             let logEl = document.getElementById('log');
             if (type === 'hit') {{
-                logEl.innerHTML = `Вы нанесли <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
+                logEl.innerHTML = `Вы нанесли <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${{data.edmg}}</span> HP`;
             }} else if (type === 'super') {{
-                logEl.innerHTML = `🔥 СУПЕРУДАР! Нанесено <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
+                logEl.innerHTML = `🔥 СУПЕРУДАР! Нанесено <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${{data.edmg}}</span> HP`;
             }}
 
             if (data.finished) {{
                 document.getElementById('endOverlay').style.display = 'flex';
                 if (data.is_win) {{
                     document.getElementById('endTitle').innerText = '🏆 ПОБЕДА!';
-                    document.getElementById('trophyBox').innerHTML = `<b>Получено:</b><br>🪙 Золото: +${data.reward_g}<br>⚪ Серебро: +${data.reward_s}<br>💎 Рубины: +${data.reward_r}`;
+                    document.getElementById('trophyBox').innerHTML = `<b>Получено:</b><br>🪙 Золото:+${{data.reward_g}}<br>⚪ Серебро:+${{data.reward_s}}<br>💎 Рубины: +${{data.reward_r}}`;
                 }} else {{
                     document.getElementById('endTitle').innerText = '💀 ПОРАЖЕНИЕ!';
                     document.getElementById('endTitle').style.color = '#ff4d4d';
