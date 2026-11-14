@@ -114,3 +114,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.textContent = LOCS[cur] || "Лагерь";
       startTimer();
 });
+// принудительный запуск таймера
+setTimeout(()=>{ startTimer(); }, 500);
+window.addEventListener('load', ()=>{ startTimer(); });
