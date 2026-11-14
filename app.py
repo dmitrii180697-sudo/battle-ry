@@ -476,6 +476,40 @@ def fight_battle():
     .potion-slot {{ background: linear-gradient(#4a3525, #2b1a0e); border: 1px solid #8a6a3d; border-radius: 4px; height: 36px; display: flex; align-items: center; justify-content: center; color: #ffb84d; font-weight: bold; font-size: 12px; cursor: pointer; }}
     </style>
 
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@7.4.2/dist/pixi.min.js"></script>
+<div id="pixi-battle" style="width:100%;max-width:420px;height:300px;margin:0 auto;border-radius:16px;overflow:hidden;border:2px solid #333"></div>
+<script>
+let pixiApp = null, heroSp = null, enemySp = null;
+try{{
+  pixiApp = new PIXI.Application({{ width: 420, height: 300, background: 0x1a1a2e, antialias: true }});
+  document.getElementById('pixi-battle').appendChild(pixiApp.view);
+  const bg = new PIXI.Graphics();
+  bg.beginFill(0x2a1a4a); bg.drawRect(0,0,420,300); bg.endFill();
+  pixiApp.stage.addChild(bg);
+  heroSp = PIXI.Sprite.from('/static/hero.png');
+  heroSp.x = 30; heroSp.y = 120; heroSp.width = 120; heroSp.height = 140;
+  pixiApp.stage.addChild(heroSp);
+  enemySp = PIXI.Sprite.from('/static/{enemy_img}');
+  enemySp.x = 270; enemySp.y = 120; enemySp.width = 120; enemySp.height = 140;
+  pixiApp.stage.addChild(enemySp);
+}}catch(e){{ console.log('pixi off', e); }}
+function pixiHit(isEnemy, dmg, isSuper){{
+  if(!pixiApp) return;
+  const target = isEnemy ? enemySp : heroSp;
+  const color = isEnemy ? '#ff4444' : '#ffcc00';
+  target.x += isEnemy ? 15 : -15;
+  setTimeout(function(){{ target.x += isEnemy ? -15 : 15; }}, 120);
+  const t = new PIXI.Text('-' + dmg, {{ fill: color, fontSize: 30, fontWeight: 'bold', stroke: 0x000000, strokeThickness: 3 }});
+  t.x = target.x + 30; t.y = 90;
+  pixiApp.stage.addChild(t);
+  let n = 0;
+  const iv = setInterval(function(){{ t.y -= 3; n++; if(n > 25){{ clearInterval(iv); pixiApp.stage.removeChild(t); }} }}, 30);
+  if(isSuper){{
+    let s = 0;
+    const sh = setInterval(function(){{ pixiApp.view.style.transform = 'translate(' + (Math.random()*8-4) + 'px,' + (Math.random()*8-4) + 'px)'; s++; if(s > 6){{ clearInterval(sh); pixiApp.view.style.transform = ''; }} }}, 40);
+  }}
+}}
+</script>
     <div class="fight-wrap" id="fightWrap">
       <div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:24px;margin-bottom:6px">Приготовься к бою!</div>
       
@@ -549,6 +583,8 @@ def fight_battle():
             document.getElementById('myBar').style.width = Math.max(0, (data.my_hp * 100 / data.my_max)) + '%';
             document.getElementById('hitCnt').innerText = data.hit_cnt;
 
+            if(data.last_dmg) pixiHit(true, data.last_dmg, type === 'super');
+            if(data.edmg) pixiHit(false, data.edmg, false);
             let logEl = document.getElementById('log');
             if (type === 'hit') {{
                 logEl.innerHTML = `Вы нанесли <span style="color:#ff4d4d">-${{data.last_dmg}}</span> HP! Враг ответил <span style="color:#ff4d4d">-${data.edmg}</span> HP`;
