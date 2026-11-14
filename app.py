@@ -400,7 +400,28 @@ def fight_battle():
         
         if m == "run":
             return jsonify({"status": "redirect", "url": "/promysel"})
-            
+
+        if m == "enemy_auto":
+            # игрок не успел за 20 сек - враг бьёт бесплатно
+            edmg = random.randint(2, 6)
+            session["my_hp"] = max(0, session.get("my_hp", my_max_hp) - edmg)
+            session.modified = True
+            # проверяем, не умер ли игрок
+            if session["my_hp"] <= 0:
+                return jsonify({
+                    "status": "lose",
+                    "edmg": edmg,
+                    "player_hp_pct": 0,
+                    "enemy_hp_pct": (session.get("enemy_hp", 0) / session.get("enemy_max_hp", 1)) * 100
+                })
+            return jsonify({
+                "status": "ok",
+                "edmg": edmg,
+                "last_dmg": 0,
+                "player_hp_pct": (session["my_hp"] / my_max_hp) * 100 if my_max_hp else 0,
+                "enemy_hp_pct": (session.get("enemy_hp", 0) / session.get("enemy_max_hp", 1)) * 100
+            })
+
         cur_my = session.get("my_hp", my_max_hp)
         cur_en = session.get("enemy_hp", 20)
         hit_cnt = session.get("hit_count", 0)
@@ -478,7 +499,13 @@ def fight_battle():
 
     <div class="fight-wrap" id="fightWrap">
       <div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:24px;margin-bottom:6px">Приготовься к бою!</div>
-      
+      <div style="text-align:center;margin:0 10px 5px">
+  <div style="height:8px;background:#222;border-radius:10px;overflow:hidden">
+    <div id="timerBar" style="height:100%;width:100%;background:#ffcc00"></div>
+  </div>
+  <div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div>
+</div>
+
       <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:6px 10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div>
         <div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:4px"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.2s"></div></div>

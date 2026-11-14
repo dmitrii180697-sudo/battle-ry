@@ -1,6 +1,30 @@
+let canAttack = true;
+let timeLeft = 20;
+let timerInt = null;
+
+function startTimer(){
+  clearInterval(timerInt);
+  timeLeft = 20;
+  let bar = document.getElementById('timerBar');
+  let txt = document.getElementById('turnText');
+  if(bar) bar.style.width = '100%';
+  timerInt = setInterval(()=>{
+    timeLeft--;
+    if(bar) bar.style.width = (timeLeft*5)+'%';
+    if(txt) txt.innerText = 'Твой ход! '+timeLeft+' сек';
+    if(timeLeft <= 0){
+      clearInterval(timerInt);
+      if(txt) txt.innerText = 'Ты замешкался! Враг бьёт!';
+      makeAction('enemy_auto');
+    }
+  }, 1000);
+}
 async function makeAction(type) {
-    if (window.isAnimating) return;
-    window.isAnimating = true;
+   if(!canAttack) return;
+canAttack = false;
+clearInterval(timerInt);
+if(window.isAnimating) return;
+window.isAnimating = true;
   
     const hero = document.getElementById('heroImg') || document.getElementById('hero');
     const enemy = document.getElementById('enemyImg') || document.getElementById('enemy');
@@ -88,4 +112,5 @@ document.addEventListener("DOMContentLoaded", () => {
     const cur = p.get("loc") || "lager";
     const el = document.getElementById("locName");
     if (el) el.textContent = LOCS[cur] || "Лагерь";
+      startTimer();
 });
