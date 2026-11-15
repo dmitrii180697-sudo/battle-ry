@@ -5,6 +5,31 @@ from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+# === ОПЫТ / УРОВНИ - МАКС 21 ===
+XP_TABLE = [0, 0, 100, 300, 700, 1400, 2600, 4600, 7900, 13300, 22100, 36400, 59600, 97200, 158100, 256700, 416300, 674600, 1092600, 1769000, 2863500, 4634500]
+MAX_LVL = 21
+
+def get_lvl_by_xp(xp):
+    lvl = 1
+    for i in range(1, MAX_LVL + 1):
+        if xp >= XP_TABLE[i]:
+            lvl = i
+        else:
+            break
+    return lvl
+
+def add_xp(amount):
+    old_lvl = session.get("lvl", 1)
+    new_xp = session.get("xp", 0) + amount
+    new_lvl = get_lvl_by_xp(new_xp)
+    session["xp"] = new_xp
+    session["lvl"] = new_lvl
+    if new_lvl > old_lvl:
+        up = new_lvl - old_lvl
+        session["my_max_hp"] = session.get("my_max_hp", 100) + up * 10
+        session["my_hp"] = session.get("my_hp", 100) + up * 10
+        return True
+    return False
 app.secret_key = os.environ.get("SECRET_KEY", "battle2026_long_key_123")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")

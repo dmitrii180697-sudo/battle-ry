@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Бой</title>
+<style>
+  body{background:#1a1a1a;color:#fff;font-family:Arial;text-align:center;margin:0;padding:10px}
+  .battle-names{display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:bold}
+  #battle-timer{font-size:28px;background:#333;padding:5px 15px;border-radius:10px}
+  .location_battle{display:flex;justify-content:space-between;margin:20px 0}
+  .fighter img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:2px solid #555}
+  .hit-btn{width:32%;padding:15px 0;font-size:16px;margin:5px 0;background:#2e7d32;color:#fff;border:none;border-radius:10px}
+  #battle-log{min-height:40px;margin-top:15px;color:#ffcc80}
+</style>
+</head>
+<body>
+<div class="battle-names">
+  <span>ТЫ ({{ lvl }} ур.)</span>
+  <span id="battle-timer">30</span>
+  <span>{{ enemy_type }}</span>
+</div>
+<div class="location_battle">
+  <div class="fighter">
+    <img src="/static/{{ player_img }}">
+    <div>❤️ <span id="HeroLifeL">{{ my_hp }}</span> / {{ my_max_hp }}</div>
+  </div>
+  <div class="fighter">
+    <img src="/static/{{ enemy_img }}">
+    <div><span id="HeroLifeR">{{ enemy_hp }}</span> / {{ enemy_max }} ❤️</div>
+  </div>
+</div>
+<div id="battle-log">Бой начался! Бей первым!</div>
+<div>
+  <button class="hit-btn" onclick="doHit('head')">👊 ГОЛОВА</button>
+  <button class="hit-btn" onclick="doHit('body')">👊 ТЕЛО</button>
+  <button class="hit-btn" onclick="doHit('legs')">👊 НОГИ</button>
+</div>
+<script src="/static/game.js"></script>
+</body>
+</html>
