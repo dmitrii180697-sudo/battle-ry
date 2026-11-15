@@ -485,11 +485,53 @@ def alliance():
     if "uid" not in session: return redirect("/")
     return render_page('<div class="wrap" style="padding:15px;text-align:center"><h2>🤝 Альянс</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">Альянсы скоро появятся!</div><a href="/game" class="btn-orange">← На главную</a></div>', True)
 
-@app.route("/bank")
+@app.route("/bank", methods=["GET","POST"])
 def bank():
     if "uid" not in session: return redirect("/")
-    p=get_player(session["uid"]); l,h,r,g,s=vals(p)
-    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>🏦 Банк</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">У тебя: {g}🪙 {s}⚪ {r}💎<br><br>100⚪ = 1🪙 - обмен автоматический</div><a href="/game" class="btn-orange">← На главную</a></div>', True)
+    p=get_player(session["uid"]); l,hr,r,g,s=vals(p)
+    # r = кристаллы, g = золото у тебя в vals
+    if request.method=="POST":
+        try: amount=int(request.form.get("amount",0))
+        except: amount=0
+        action=request.form.get("action")
+        if amount>0:
+            conn=get_db(); cur=conn.cursor()
+            if action=="exchange" and r>=amount:
+                # 1 кристалл = 500 золота
+                cur.execute("UPDATE players SET rubies=rubies-%s, gold=gold+%s WHERE id=%s",(amount, amount*500, p["id"]))
+                conn.commit()
+            cur.close(); conn.close()
+            return redirect("/bank")
+
+    return render_page(f'''<div class="wrap" style="padding:15px;text-align:center">
+    <h2>🏦 Банк</h2>
+    <p style="font-size:18px">💎 Кристаллов: {r} | 🪙 Золота: {g}</p>
+    <hr>
+    <h3>💎 Купить кристаллы</h3>
+    <p>100 💎 — 500 ₸</p>
+    <p>550 💎 — 2500 ₸</p>
+    <p>1200 💎 — 5000 ₸</p>
+    <p>3000 💎 — 10000 ₸</p>
+    <p style="color:#ffd700">Переведи на Kaspi и напиши админу свой ник!<br>Админ выдаст кристаллы вручную.</p>
+    <hr>
+    <h3>🔄 Обмен кристаллов на золото</h3>
+    <p>Курс: 1 💎 = 500 🪙</p>
+    <form method="post">
+      <input name="amount" type="number" placeholder="Сколько кристаллов" style="padding:10px;width:70%">
+      <br><br><button name="action" value="exchange" style="padding:10px 20px">Обменять на золото</button>
+    </form>
+    <br><a href="/game"><button>⬅ Назад</button></a>
+    </div>''')
+
+@app.route("/pvp")
+def pvp():
+    if "uid" not in session: return redirect("/")
+    conn=get_db(); cur=conn.cursor()
+    cur.execute("SELECT * FROM players WHERE id!=%s ORDER BY level DESC",(session["uid"],))
+    rows=cur.fetchall(); cur.close(); conn.close()
+    items="".join([f'<div style="border:1px solid #444;padding:10px;margin:8px;border-radius:10px">{r["username"]} — Ур. {r["level"]} | 🪙 {r["gold"]}<br><a href="/battle"><button>⚔️ Атаковать</button></a></div>' for r in rows])
+    if not items: items='<p>Пока никого нет</p>'
+    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>⚔️ PVP — Выбери соперника</h2>{items}<br><a href="/game"><button>⬅ Назад</button></a></div>')
 
 @app.route("/quests")
 def quests():
