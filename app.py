@@ -287,6 +287,7 @@ def game():
           <a href="/alliance" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🛡️<br>Альянс</a>
           <a href="/shop" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🛒<br>Магазин</a>
           <a href="/hero" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">✉️<br>Почта</a>
+          <a href="/bank" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px;border-radius:10px">🏦<br>Банк</a>
         </div>
         <div style="flex:1;text-align:center"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:14px 8px;border-radius:12px"><b style="color:#f5d98a;font-size:18px">Текущая зона</b><div style="font-size:24px;font-weight:bold;color:#fff;margin:10px 0">{loc_title}</div></div></div>
         <div style="display:flex;flex-direction:column;gap:10px;width:104px">
@@ -295,6 +296,7 @@ def game():
           <a href="/hero" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">⭐<br>Премиум</a>
           <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">💬<br>Чат</a>
           <a href="/logout" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🚪<br>Выход</a>
+          <a href="/pvp" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px;border-radius:10px">⚔️<br>PVP</a>
         </div>
       </div>
       <div style="display:flex;gap:10px;align-items:stretch">
