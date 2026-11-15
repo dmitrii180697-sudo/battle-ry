@@ -8,10 +8,24 @@
   body{background:#1a1a1a;color:#fff;font-family:Arial;text-align:center;margin:0;padding:10px}
   .battle-names{display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:bold}
   #battle-timer{font-size:28px;background:#333;padding:5px 15px;border-radius:10px}
-  .location_battle{display:flex;justify-content:space-between;margin:20px 0}
+  .location_battle{display:flex;justify-content:space-between;margin:20px 0;position:relative}
+  .fighter{position:relative;transition:all 0.3s}
   .fighter img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:2px solid #555}
+  .fighter.hit{animation:shake 0.3s}
+  .fighter.attack-me{animation:attackR 0.4s}
+  .fighter.attack-en{animation:attackL 0.4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @keyframes attackR{50%{transform:translateX(50px)}}
+  @keyframes attackL{50%{transform:translateX(-50px)}}
+  .dmg{position:absolute;font-weight:900;font-size:22px;text-shadow:2px 2px 0 #000;animation:floatUp 1s forwards;pointer-events:none;z-index:10}
+  @keyframes floatUp{to{transform:translateY(-60px);opacity:0}}
+  .hp-bar{height:12px;background:#333;border:1px solid #000;border-radius:6px;overflow:hidden;margin-top:5px}
+  .hp-fill{height:100%;background:linear-gradient(#7CFC00,#2E8B57);transition:width 0.3s}
   .hit-btn{width:32%;padding:15px 0;font-size:16px;margin:5px 0;background:#2e7d32;color:#fff;border:none;border-radius:10px}
+  .btn-x2{width:32%;padding:15px 0;font-size:16px;margin:5px 0;background:#FFC107;color:#000;border:none;border-radius:10px;font-weight:bold}
   #battle-log{min-height:40px;margin-top:15px;color:#ffcc80}
+  .potions{display:flex;gap:5px;justify-content:center;background:#d4b87a;padding:10px;border-radius:10px;margin-top:10px}
+  .potion{width:45px;height:60px;background:#f5e6b8;border:2px solid #8B5A2B;border-radius:8px;text-align:center;color:#333;font-size:11px;padding-top:5px}
 </style>
 </head>
 <body>
@@ -20,22 +34,101 @@
   <span id="battle-timer">30</span>
   <span>{{ enemy_type }}</span>
 </div>
-<div class="location_battle">
-  <div class="fighter">
+
+<div class="location_battle" id="arena">
+  <div class="fighter" id="me">
     <img src="/static/{{ player_img }}">
     <div>❤️ <span id="HeroLifeL">{{ my_hp }}</span> / {{ my_max_hp }}</div>
+    <div class="hp-bar"><div class="hp-fill" id="myBar" style="width:100%"></div></div>
   </div>
-  <div class="fighter">
+  <div class="fighter" id="enemy">
     <img src="/static/{{ enemy_img }}">
     <div><span id="HeroLifeR">{{ enemy_hp }}</span> / {{ enemy_max }} ❤️</div>
+    <div class="hp-bar"><div class="hp-fill" id="enBar" style="width:100%;background:linear-gradient(#ff6b6b,#c0392b)"></div></div>
   </div>
 </div>
+
 <div id="battle-log">Бой начался! Бей первым!</div>
+
 <div>
   <button class="hit-btn" onclick="doHit('head')">👊 ГОЛОВА</button>
   <button class="hit-btn" onclick="doHit('body')">👊 ТЕЛО</button>
   <button class="hit-btn" onclick="doHit('legs')">👊 НОГИ</button>
 </div>
+
+<div>
+  <button class="btn-x2" onclick="toggleSpeed()">⏩ x2 СКОРОСТЬ</button>
+</div>
+
+<div class="potions">
+  <div class="potion">🧪<br>0</div><div class="potion">🧪<br>0</div>
+  <div class="potion">🧪<br>0</div><div class="potion">🧪<br>0</div>
+  <div class="potion">🧪<br>0</div><div class="potion">🧪<br>0</div>
+  <div class="potion">🧪<br>0</div>
+</div>
+
 <script src="/static/game.js"></script>
+<script>
+// === ДОБАВКА КАК НА 2-М ВИДЕО ===
+let myHp = {{ my_hp }};
+let myMax = {{ my_max_hp }};
+let enHp = {{ enemy_hp }};
+let enMax = {{ enemy_max }};
+let speed = 1, interval = 1500;
+
+function showDmg(x, y, text, color){
+  let d = document.createElement('div');
+  d.className='dmg'; d.innerText=text; d.style.color=color;
+  d.style.left=x+'px'; d.style.top=y+'px';
+  document.getElementById('arena').appendChild(d);
+  setTimeout(()=>d.remove(), 1000);
+}
+
+function updateBars(){
+  document.getElementById('HeroLifeL').innerText = myHp;
+  document.getElementById('HeroLifeR').innerText = enHp;
+  document.getElementById('myBar').style.width = (myHp/myMax*100)+'%';
+  document.getElementById('enBar').style.width = (enHp/enMax*100)+'%';
+}
+
+// Перехватываем старый doHit, добавляем анимацию
+let oldDoHit = window.doHit;
+window.doHit = function(part){
+  let meEl = document.getElementById('me');
+  let enEl = document.getElementById('enemy');
+  meEl.classList.add('attack-me'); enEl.classList.add('hit');
+  setTimeout(()=>{
+    let dmg = Math.floor(Math.random()*8)+2;
+    enHp = Math.max(0, enHp - dmg);
+    showDmg(220, 20, '-'+dmg, '#ff4444');
+    meEl.classList.remove('attack-me'); enEl.classList.remove('hit');
+    updateBars();
+  }, 300);
+  setTimeout(()=>{
+    enEl.classList.add('attack-en'); meEl.classList.add('hit');
+    setTimeout(()=>{
+      let dmg2 = Math.floor(Math.random()*6)+1;
+      myHp = Math.max(0, myHp - dmg2);
+      showDmg(20, 20, '-'+dmg2, '#ff4444');
+      enEl.classList.remove('attack-en'); meEl.classList.remove('hit');
+      updateBars();
+    }, 300);
+  }, 600);
+  if(oldDoHit) oldDoHit(part);
+}
+
+function toggleSpeed(){
+  speed = speed==1?2:1;
+  clearInterval(timer);
+  timer = setInterval(autoRound, interval/speed);
+  document.getElementById('battle-log').innerText = 'Скорость: x'+speed;
+}
+
+function autoRound(){
+  // Автобой как на 2-м видео - сам бьёт
+  window.doHit('body');
+}
+let timer = setInterval(autoRound, interval);
+</script>
 </body>
-</html>
+</html>>
