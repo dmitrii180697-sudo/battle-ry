@@ -407,13 +407,31 @@ def shop():
 @app.route("/hero")
 def hero():
     if "uid" not in session: return redirect("/")
-    p = get_player(session["uid"]); l,h,r,g,s = vals(p)
-    nick = p.get("name","Воин") if isinstance(p, dict) or hasattr(p,'get') else "Воин"
-    exp = int(p.get("exp",0)) if isinstance(p, dict) or hasattr(p,'get') else 0
-    wins = int(p.get("wins",0)) if isinstance(p, dict) or hasattr(p,'get') else 0
-    losses = int(p.get("losses",0)) if isinstance(p, dict) or hasattr(p,'get') else 0
-    admin_tag = " 👑 АДМИН" if is_admin() else ""
-    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>👤 {nick}{admin_tag}</h2><img src="/static/barbarian_game_size.png" style="height:180px"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px;text-align:left"><b>Уровень:</b> {l}<br><b>HP:</b> {h}<br><b>Опыт:</b> {exp}<br><b>Побед:</b> {wins} | <b>Поражений:</b> {losses}<br><b>Золото:</b> {g}🪙 {s}⚪ {r}💎</div><a href="/game" class="btn-orange">← На главную</a></div>', True)
+    p=get_player(session["uid"]); l,hr,r,g,s=vals(p)
+    nick = p.get("name","Воин") if isinstance(p,dict) or hasattr(p,'get') else "Воин"
+    exp = int(p.get("exp",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
+    wins = int(p.get("wins",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
+    losses = int(p.get("losses",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
+    admin_tag = " 👑 ADMIN" if is_admin() else ""
+    # Твоя формула: 1 ур = 10 жизни и все по 1, 2 ур = 20 и все по 2
+    hp = l*10
+    st = l
+    exp_need = l*100
+    return render_page(f'''<div class="wrap" style="padding:15px">
+    <h2 style="text-align:center">🧝 Герой {nick}{admin_tag}</h2>
+    <p style="text-align:center">Уровень {l} / 21 | Опыт {exp} / {exp_need} | Победы {wins} / Поражения {losses}</p>
+    <div style="background:#e8d5a3;color:#000;padding:15px;border-radius:10px;font-size:18px;line-height:2">
+      <div style="display:flex;justify-content:space-between"><span>Жизнь:</span><span>❤️ {hp}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Урон:</span><span>🗡️ {st}...{st}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Точность:</span><span>🎯 {st}...{st}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Броня:</span><span>🛡️ {st}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Уворот:</span><span>💨 {st}...{st}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Оглушение:</span><span>🥢 {st}...{st}</span></div>
+      <div style="display:flex;justify-content:space-between"><span>Блок:</span><span>🔰 {st}</span></div>
+    </div>
+    <p style="text-align:center;color:#aaa;font-size:13px">Слава и Звания — скоро</p>
+    <br><div style="text-align:center"><a href="/game"><button>⬅ Назад</button></a></div>
+    </div>''')
 
 @app.route("/player/<int:pid>")
 def player_view(pid):
