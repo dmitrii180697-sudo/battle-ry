@@ -1,5 +1,5 @@
-import os, random, json
-from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template_string
+import os, random, json, time, re
+from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template_string, render_template
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -41,9 +41,11 @@ def init_db():
         if DATABASE_URL:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
             cur.execute("CREATE TABLE IF NOT EXISTS monster_cfg (key TEXT PRIMARY KEY, data TEXT)")
+            cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INTEGER DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
             cur.execute("CREATE TABLE IF NOT EXISTS monster_cfg (key TEXT PRIMARY KEY, data TEXT)")
+            cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
         conn.commit()
         for k,v in DEFAULT_MONSTERS.items():
             if DATABASE_URL: cur.execute("SELECT * FROM monster_cfg WHERE key=%s",(k,))
@@ -58,8 +60,7 @@ init_db()
 def get_monsters():
     try:
         conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("SELECT * FROM monster_cfg")
-        else: cur.execute("SELECT * FROM monster_cfg")
+        cur.execute("SELECT * FROM monster_cfg")
         rows=cur.fetchall(); cur.close(); conn.close()
         out={}
         for r in rows:
@@ -294,7 +295,7 @@ def game():
           <a href="/quests" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">📜<br>Квесты</a>
           <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🟢<br>Онлайн</a>
           <a href="/hero" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">⭐<br>Премиум</a>
-          <a href="/online" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">💬<br>Чат</a>
+          <a href="/chat" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">💬<br>Чат</a>
           <a href="/logout" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:10px 4px;font-weight:800;border-radius:6px">🚪<br>Выход</a>
           <a href="/pvp" style="background:rgba(10,38,66,.92);border:2px solid #4a7ba6;color:#fff;text-decoration:none;text-align:center;padding:12px;border-radius:10px">⚔️<br>PVP</a>
         </div>
@@ -365,44 +366,160 @@ def fight_battle():
         elif cur_my <= 0 and not session.get("rewarded"):
             add_loss(session["uid"]); session["rewarded"] = True; finished = True; is_win = False
         return jsonify({"enemy_hp": cur_en, "enemy_max": session.get("enemy_max", 20), "my_hp": cur_my, "my_max": my_max_hp, "hit_cnt": hit_cnt, "last_dmg": dmg, "edmg": edmg, "finished": finished, "is_win": is_win, "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0)})
+    # GET - теперь через templates/battle.html
     cur_enemy_hp = session.get("enemy_hp", 20); enemy_max_hp = session.get("enemy_max", 20); cur_my_hp = session.get("my_hp", my_max_hp); hit_cnt = session.get("hit_count", 0)
     enemy_name = session.get("enemy_type", "Древний Воин"); enemy_img = session.get("enemy_img", "ancient_warrior.png")
     my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0; enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
+    return render_template("battle.html",
+        lvl=lvl, enemy_type=enemy_name, player_img="barbarian_game_size.png",
+        enemy_img=enemy_img, my_hp=cur_my_hp, my_max_hp=my_max_hp, my_per=my_per,
+        enemy_hp=cur_enemy_hp, enemy_max=enemy_max_hp, enemy_per=enemy_per,
+        hit_cnt=hit_cnt)
+
+# ===== 💬 ЧАТ + АВТОБАН =====
+BAD_WORDS = ["бля", "хуй", "пизд", "сука", "ебан", "нахуй", "fuck", "shit"]
+CHAT_SPAM = {}
+
+def chat_check(uid, text):
+    if "http://" in text or "https://" in text or "t.me/" in text or "www." in text:
+        return False, "Ссылки в чате запрещены! Мут 10 мин"
+    low = text.lower()
+    for w in BAD_WORDS:
+        if w in low:
+            return False, "Мат в чате запрещён!"
+    now = time.time()
+    lst = CHAT_SPAM.get(uid, [])
+    lst = [t for t in lst if now - t < 10]
+    lst.append(now)
+    CHAT_SPAM[uid] = lst
+    if len(lst) >= 5:
+        return False, "Спам! Мут 10 мин"
+    return True, "ok"
+
+@app.route("/chat")
+def chat_page():
+    if "uid" not in session: return redirect("/")
+    p = get_player(session["uid"])
+    nick = p.get("name","Воин") if isinstance(p, dict) else "Воин"
     html = f'''
     <style>
-    body {{ background: #1a0e0a; margin: 0; font-family: Arial; }}
-    .fight-wrap {{ max-width: 420px; margin: 0 auto; padding: 10px; }}
-    @keyframes attackLeft {{ 0%{{transform:translateX(0)}} 50%{{transform:translateX(30px)}} 100%{{transform:translateX(0)}} }}
-    @keyframes shakeRight {{ 0%,100%{{transform:translateX(0)}} 20%{{transform:translateX(-6px)}} 40%{{transform:translateX(6px)}} }}
-    .potions-bar {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; background: #2b1a0e; padding: 6px; border: 2px solid #5a3e22; border-radius: 8px; margin-top: 10px; }}
-    .potion-slot {{ background: linear-gradient(#4a3525, #2b1a0e); border: 1px solid #8a6a3d; border-radius: 4px; height: 36px; display: flex; align-items: center; justify-content: center; color: #ffb84d; font-weight: bold; font-size: 12px; }}
+    .chat-wrap{{max-width:480px;margin:0 auto;min-height:100dvh;background:#0a1e35;padding:10px;box-sizing:border-box;display:flex;flex-direction:column}}
+    .chat-tabs{{display:flex;gap:6px;margin-bottom:8px}}
+    .chat-tab{{flex:1;text-align:center;padding:10px;background:#122c4d;color:#fff;border:2px solid #4a7ba6;border-radius:8px;font-weight:900;cursor:pointer}}
+    .chat-tab.active{{background:#e8c268;color:#000;border-color:#e8c268}}
+    #chatBox{{flex:1;background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:10px;overflow-y:auto;min-height:320px;max-height:420px}}
+    .msg{{margin-bottom:8px;background:#fff;padding:6px 8px;border-radius:8px;border:1px solid #e8d6a8}}
+    .msg b{{color:#0a1e35}} .msg small{{color:#888}}
     </style>
-    <div class="fight-wrap" id="fightWrap">
-      <div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:24px;margin-bottom:6px">Приготовься к бою!</div>
-      <div style="text-align:center;margin:0 10px 5px"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
-      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:6px 10px;margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-weight:900"><span>{enemy_name}</span><span><span id="enHp">{cur_enemy_hp}</span>/{enemy_max_hp}</span></div><div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:4px"><div id="enBar" style="width:{enemy_per}%;height:100%;background:#ff3b30;transition:width 0.2s"></div></div></div>
-      <div style="background:url('/static/camp.jpg') center/cover no-repeat;border-radius:16px;border:3px solid #c89b5e;height:220px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px">
-        <div style="flex:1;text-align:center;position:relative"><img id="heroImg" src="/static/barbarian_game_size.png" style="height:130px;filter:drop-shadow(0 4px 8px black);"></div>
-        <div style="flex:1;text-align:center;position:relative"><img id="enemyImg" src="/static/{enemy_img}" style="height:130px;filter:drop-shadow(0 4px 8px black);"></div>
+    <div class="chat-wrap">
+      <div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:10px;text-align:center;color:#fff;font-weight:900;border-radius:8px">💬 ЧАТ — {nick}</div>
+      <div class="chat-tabs">
+        <div class="chat-tab active" onclick="setTab('all',this)">🌍 Общий</div>
+        <div class="chat-tab" onclick="setTab('trade',this)">💰 Торговля</div>
+        <div class="chat-tab" onclick="setTab('clan',this)">🛡️ Клан</div>
       </div>
-      <div style="background:rgba(245,230,200,0.95);border:2px solid #8b5a2b;border-radius:10px;padding:6px 10px;margin:8px 0"><div style="display:flex;justify-content:space-between;font-weight:900"><span>ВЫ</span><span><span id="myHp">{cur_my_hp}</span>/{my_max_hp}</span></div><div style="height:10px;background:#3a2a1a;border-radius:4px;overflow:hidden;margin-top:4px"><div id="myBar" style="width:{my_per}%;height:100%;background:#2ecc40;transition:width 0.2s"></div></div></div>
-      <div id="battleLog" style="background:#1a0e0a;max-height:120px;overflow-y:auto;border:2px solid #5a3e22;border-radius:8px;margin:8px 10px;padding:4px"></div>
-      <div style="display:flex;gap:8px">
-        <button type="button" onclick="makeAction('hit')" style="flex:1;background:#2b1a0e;border:2px solid #ff8c00;border-radius:10px;padding:12px;color:#ffb84d;font-weight:900;cursor:pointer">⚔️ УДАР (<span id="hitCnt">{hit_cnt}</span>/5)</button>
-        <button type="button" onclick="makeAction('super')" style="flex:1;background:#2b1a0e;border:2px solid #ffcc00;border-radius:10px;padding:12px;color:#ff0;font-weight:900;cursor:pointer">⚡ СУПЕР</button>
-        <button type="button" onclick="makeAction('run')" style="background:#3a2a1a;border:2px solid #777;border-radius:10px;color:#ccc;padding:12px;font-weight:900;cursor:pointer">БЕГ</button>
+      <div id="chatBox">Загрузка...</div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="chatInput" placeholder="Написать..." style="flex:1;padding:12px;border-radius:8px;border:2px solid #8a6a3d;background:#fdf6c8">
+        <button onclick="sendChat()" style="padding:12px 16px;background:#e8c268;border:2px solid #5a3e22;border-radius:8px;font-weight:900">➤</button>
       </div>
-      <div class="potions-bar"><div class="potion-slot">🍷 1</div><div class="potion-slot">🧪 2</div><div class="potion-slot">📜 3</div><div class="potion-slot">🛡️ 4</div><div class="potion-slot">⚡ 5</div></div>
+      <a href="/game" style="display:block;text-align:center;color:#fff;margin-top:10px;text-decoration:none;font-weight:bold">← На главную</a>
     </div>
-    <div id="endOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px"><div style="background:linear-gradient(#3a2510,#1a0e0a);border:3px solid #ffcc00;border-radius:22px;padding:26px;width:100%;max-width:320px;text-align:center;box-shadow:0 0 40px gold"><h2 id="endTitle" style="margin:0;color:gold;font-size:26px"></h2><div id="trophyBox" style="background:rgba(255,215,0,0.12);border:1.5px solid #c9a45c;border-radius:14px;padding:14px;margin:14px 0;font-size:16px;line-height:1.8;color:#ffe9a3"></div><a href="/promysel" style="display:block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:14px;border-radius:12px;font-weight:900;text-decoration:none">На промысел ➔</a></div></div>
-    <script src="/static/game.js"></script>
+    <script>
+    let curTab='all';
+    function setTab(t,el){{curTab=t; document.querySelectorAll('.chat-tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); loadChat();}}
+    async function loadChat(){{
+      let res = await fetch('/api/chat?tab='+curTab); let data = await res.json();
+      let box = document.getElementById('chatBox');
+      if(!data.length){{ box.innerHTML='<p style="text-align:center;color:#888">Пока пусто. Напиши первым!</p>'; return; }}
+      box.innerHTML = data.map(m=>`<div class="msg"><b>${{m.name}}</b> <small>${{m.time}} • ${{m.lvl}} ур.</small><br>${{m.text}}</div>`).join('');
+      box.scrollTop = box.scrollHeight;
+    }}
+    async function sendChat(){{
+      let inp = document.getElementById('chatInput'); let txt = inp.value.trim(); if(!txt) return;
+      let res = await fetch('/api/chat',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{tab:curTab,text:txt}})}});
+      let d = await res.json();
+      if(!d.ok){{ alert(d.msg); return; }}
+      inp.value=''; loadChat();
+    }}
+    document.getElementById('chatInput').addEventListener('keydown',e=>{{if(e.key==='Enter') sendChat();}});
+    setInterval(loadChat, 3000); loadChat();
+    </script>
     '''
     return render_page(html, False)
+
+@app.route("/api/chat", methods=["GET","POST"])
+def api_chat():
+    if "uid" not in session: return jsonify([])
+    if request.method == "GET":
+        tab = request.args.get("tab","all")
+        try:
+            conn=get_db(); cur=conn.cursor()
+            q = "SELECT c.text, c.created_at, p.name, p.level FROM chat_messages c JOIN players p ON p.id=c.uid WHERE c.tab=%s ORDER BY c.id DESC LIMIT 50" if DATABASE_URL else "SELECT c.text, c.created_at, p.name, p.level FROM chat_messages c JOIN players p ON p.id=c.uid WHERE c.tab=? ORDER BY c.id DESC LIMIT 50"
+            cur.execute(q,(tab,)); rows=cur.fetchall(); cur.close(); conn.close()
+            out=[]
+            for row in reversed(rows):
+                txt = row["text"] if isinstance(row,dict) else row[0]
+                tm = str(row["created_at"] if isinstance(row,dict) else row[1])[:16]
+                nm = row["name"] if isinstance(row,dict) else row[2]
+                lvl = row["level"] if isinstance(row,dict) else row[3]
+                out.append({"text":txt,"time":tm,"name":nm,"lvl":lvl})
+            return jsonify(out)
+        except: return jsonify([])
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text","")).strip()[:200]
+    tab = data.get("tab","all")
+    if not text: return jsonify({"ok":False,"msg":"Пустое сообщение"})
+    ok, msg = chat_check(session["uid"], text)
+    if not ok: return jsonify({"ok":False,"msg":msg})
+    try:
+        conn=get_db(); cur=conn.cursor()
+        if DATABASE_URL: cur.execute("INSERT INTO chat_messages (uid, tab, text) VALUES (%s,%s,%s)",(session["uid"],tab,text))
+        else: cur.execute("INSERT INTO chat_messages (uid, tab, text) VALUES (?,?,?)",(session["uid"],tab,text))
+        conn.commit(); cur.close(); conn.close()
+        return jsonify({"ok":True})
+    except Exception as e: return jsonify({"ok":False,"msg":str(e)})
 
 @app.route("/shop")
 def shop():
     if "uid" not in session: return redirect("/")
-    return render_page('<div class="wrap" style="padding:15px"><h2 style="text-align:center">🛒 Магазин</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0">🗡️ Меч воина - 10🪙<br><button class="btn-orange" onclick="alert(\'Скоро будет покупка!\')">Купить</button></div><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0">🛡️ Щит - 15🪙<br><button class="btn-orange" onclick="alert(\'Скоро будет покупка!\')">Купить</button></div><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0">🧪 Зелье HP - 5⚪<br><button class="btn-orange" onclick="alert(\'Скоро будет покупка!\')">Купить</button></div><a href="/game" class="btn-orange">← На главную</a></div>', True)
+    p = get_player(session["uid"]); l, h, r, g, s = vals(p)
+    html = f'''
+    <style>
+    .shop-wrap{{max-width:480px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#0a1e35 0%,#122c4d 40%,#1a0e0a 100%);padding:12px;box-sizing:border-box}}
+    .shop-top{{background:rgba(8,30,55,.92);border:2px solid #4a7ba6;border-radius:10px;padding:10px;text-align:center;color:#fff;font-weight:900;font-size:20px}}
+    .shop-balance{{display:flex;justify-content:space-around;background:rgba(8,30,55,.88);border:2px solid #4a7ba6;border-radius:10px;padding:8px;margin:10px 0;color:#fff;font-weight:900}}
+    .shop-btn{{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;text-decoration:none;color:#fff;font-weight:900;font-size:22px;padding:20px 10px;margin-bottom:8px;border-radius:10px;border:2px solid #000;box-shadow:0 4px 0 rgba(0,0,0,.5);text-shadow:0 2px 4px rgba(0,0,0,.7)}}
+    .c-weapon{{background:linear-gradient(180deg,#3a1a1a,#7a1f1f);border-color:#ffb84d}}
+    .c-armor{{background:linear-gradient(180deg,#1a2a3a,#2f5a7a);border-color:#7ab8ff}}
+    .c-potion{{background:linear-gradient(180deg,#1a3a1a,#2a7a2a);border-color:#7aff8a}}
+    .c-amulet{{background:linear-gradient(180deg,#3a2a4a,#7a3ab8);border-color:#d8a7ff}}
+    .c-misc{{background:linear-gradient(180deg,#3a331a,#8a7a2a);border-color:#ffe97a}}
+    .c-auction{{background:linear-gradient(180deg,#3a1a2a,#a62a5a);border-color:#ff7ab8}}
+    .c-sell{{background:linear-gradient(180deg,#222,#555);border-color:#ccc}}
+    .c-char{{background:linear-gradient(180deg,#4a2a0a,#c98a2a);border-color:#ffcc00}}
+    </style>
+    <div class="shop-wrap">
+      <div class="shop-top">🛒 МАГАЗИН</div>
+      <div class="shop-balance"><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div>
+      <a href="/shop/weapon" class="shop-btn c-weapon">🗡️ Оружие</a>
+      <a href="/shop/armor" class="shop-btn c-armor">🛡️ Броня</a>
+      <a href="/shop/potion" class="shop-btn c-potion">🧪 Зелья и Свитки</a>
+      <a href="/shop/amulet" class="shop-btn c-amulet">🔮 Амулеты</a>
+      <a href="/shop/misc" class="shop-btn c-misc">📦 Разное</a>
+      <a href="/shop/auction" class="shop-btn c-auction">🏆 Аукцион</a>
+      <a href="/shop/sell" class="shop-btn c-sell">💰 Продать</a>
+      <a href="/shop/chars" class="shop-btn c-char">🧝 Персонажи</a>
+      <a href="/game" style="display:block;background:#0a1e35;border:2px solid #e8c268;color:#f5e6b0;text-align:center;padding:14px;text-decoration:none;font-weight:900;border-radius:10px;margin-top:6px">← На главную</a>
+    </div>'''
+    return render_page(html, False)
+
+@app.route("/shop/<cat>")
+def shop_cat(cat):
+    if "uid" not in session: return redirect("/")
+    names={"weapon":"🗡️ Оружие","armor":"🛡️ Броня","potion":"🧪 Зелья и Свитки","amulet":"🔮 Амулеты","misc":"📦 Разное","auction":"🏆 Аукцион","sell":"💰 Продать","chars":"🧝 Персонажи"}
+    title=names.get(cat,"Магазин")
+    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>{title}</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">Тут скоро будут товары!</div><a href="/shop" class="btn-orange">← К магазину</a></div>', True)
 
 @app.route("/hero")
 def hero():
@@ -413,7 +530,6 @@ def hero():
     wins = int(p.get("wins",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     losses = int(p.get("losses",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     admin_tag = " 👑 ADMIN" if is_admin() else ""
-    # Твоя формула: 1 ур = 10 жизни и все по 1, 2 ур = 20 и все по 2
     hp = l*10
     st = l
     exp_need = l*100
@@ -452,7 +568,6 @@ def player_view(pid):
     admin_tag = " 👑 АДМИН" if lg == ADMIN_LOGIN else ""
     return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>👤 {nick}{admin_tag}</h2><p style="color:#666">@{lg} {"(Это ты!)" if is_me else ""}</p><img src="/static/barbarian_game_size.png" style="height:180px"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px;text-align:left"><b>Уровень:</b> {lvl} / 21<br><b>HP:</b> {hp}<br><b>Опыт:</b> {exp}<br><b>Побед:</b> {wins} | <b>Поражений:</b> {losses}<br><b>Золото:</b> {gold}🪙 {silver}⚪ {rubin}💎</div><a href="/online" class="btn-orange">← К игрокам</a><a href="/game" class="btn-orange">← На главную</a></div>', True)
 
-# === ТОП И ОНЛАЙН - ИГРОКИ ВИДЯТ ДРУГ ДРУГА ===
 def _player_card(p, rank=None):
     pid = p["id"] if isinstance(p,dict) else p[0]
     nm = p["name"] if isinstance(p,dict) else p[1]
@@ -474,8 +589,7 @@ def top():
     if "uid" not in session: return redirect("/")
     try:
         conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("SELECT * FROM players ORDER BY wins DESC, level DESC LIMIT 50")
-        else: cur.execute("SELECT * FROM players ORDER BY wins DESC, level DESC LIMIT 50")
+        cur.execute("SELECT * FROM players ORDER BY wins DESC, level DESC LIMIT 50")
         rows=cur.fetchall(); cur.close(); conn.close()
     except: rows=[]
     items="".join([_player_card(r, i+1) for i,r in enumerate(rows)])
@@ -487,8 +601,7 @@ def online():
     if "uid" not in session: return redirect("/")
     try:
         conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("SELECT * FROM players ORDER BY level DESC, wins DESC")
-        else: cur.execute("SELECT * FROM players ORDER BY level DESC, wins DESC")
+        cur.execute("SELECT * FROM players ORDER BY level DESC, wins DESC")
         rows=cur.fetchall(); cur.close(); conn.close()
     except: rows=[]
     items="".join([_player_card(r) for r in rows])
@@ -509,7 +622,6 @@ def alliance():
 def bank():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,hr,r,g,s=vals(p)
-    # r = кристаллы, g = золото у тебя в vals
     if request.method=="POST":
         try: amount=int(request.form.get("amount",0))
         except: amount=0
@@ -517,12 +629,11 @@ def bank():
         if amount>0:
             conn=get_db(); cur=conn.cursor()
             if action=="exchange" and r>=amount:
-                # 1 кристалл = 500 золота
-                cur.execute("UPDATE players SET rubies=rubies-%s, gold=gold+%s WHERE id=%s",(amount, amount*500, p["id"]))
+                q = "UPDATE players SET rubin=rubin-%s, gold=gold+%s WHERE id=%s" if DATABASE_URL else "UPDATE players SET rubin=rubin-?, gold=gold+? WHERE id=?"
+                cur.execute(q,(amount, amount*500, session["uid"]))
                 conn.commit()
             cur.close(); conn.close()
             return redirect("/bank")
-
     return render_page(f'''<div class="wrap" style="padding:15px;text-align:center">
     <h2>🏦 Банк</h2>
     <p style="font-size:18px">💎 Кристаллов: {r} | 🪙 Золота: {g}</p>
@@ -546,10 +657,18 @@ def bank():
 @app.route("/pvp")
 def pvp():
     if "uid" not in session: return redirect("/")
-    conn=get_db(); cur=conn.cursor()
-    cur.execute("SELECT * FROM players WHERE id!=%s ORDER BY level DESC",(session["uid"],))
-    rows=cur.fetchall(); cur.close(); conn.close()
-    items="".join([f'<div style="border:1px solid #444;padding:10px;margin:8px;border-radius:10px">{r["username"]} — Ур. {r["level"]} | 🪙 {r["gold"]}<br><a href="/battle"><button>⚔️ Атаковать</button></a></div>' for r in rows])
+    try:
+        conn=get_db(); cur=conn.cursor()
+        q = "SELECT * FROM players WHERE id!=%s ORDER BY level DESC" if DATABASE_URL else "SELECT * FROM players WHERE id!=? ORDER BY level DESC"
+        cur.execute(q,(session["uid"],))
+        rows=cur.fetchall(); cur.close(); conn.close()
+    except: rows=[]
+    items=""
+    for r in rows:
+        nm = r["name"] if isinstance(r,dict) else r[1]
+        lvl = r["level"] if isinstance(r,dict) else r[8]
+        gold = r["gold"] if isinstance(r,dict) else r[4]
+        items+=f'<div style="border:1px solid #444;padding:10px;margin:8px;border-radius:10px">{nm} — Ур. {lvl} | 🪙 {gold}<br><a href="/game"><button>⚔️ Атаковать (скоро)</button></a></div>'
     if not items: items='<p>Пока никого нет</p>'
     return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>⚔️ PVP — Выбери соперника</h2>{items}<br><a href="/game"><button>⬅ Назад</button></a></div>')
 
@@ -558,7 +677,6 @@ def quests():
     if "uid" not in session: return redirect("/")
     return render_page('<div class="wrap" style="padding:15px"><h2 style="text-align:center">📜 Задания</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0">⚔️ Победи 3 монстра - Награда: 10🪙</div><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0">🏆 Дойди до 5 уровня - Награда: 5💎</div><a href="/game" class="btn-orange">← На главную</a></div>', True)
 
-# === 👑 АДМИН ПАНЕЛЬ ===
 @app.route("/admin", methods=["GET","POST"])
 def admin():
     if "uid" not in session: return redirect("/")
@@ -628,8 +746,7 @@ def admin():
         except Exception as e: msg = f"❌ Ошибка: {e}"
         cur.close(); conn.close()
     conn=get_db(); cur=conn.cursor()
-    if DATABASE_URL: cur.execute("SELECT * FROM players ORDER BY id")
-    else: cur.execute("SELECT * FROM players ORDER BY id")
+    cur.execute("SELECT * FROM players ORDER BY id")
     players = cur.fetchall(); cur.close(); conn.close()
     monsters = get_monsters()
     players_html = ""
@@ -702,3 +819,4 @@ def admin():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+  

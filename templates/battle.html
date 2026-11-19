@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Бой</title>
 <style>
   body{background:#1a0e0a;color:#fff;font-family:Arial;text-align:center;margin:0;padding:10px}
@@ -13,25 +13,38 @@
   .hp-bar{height:12px;background:#333;border-radius:6px;overflow:hidden;margin-top:5px}
   .hp-fill{height:100%;background:linear-gradient(#7CFC00,#2E8B57);transition:width .3s}
   .hit-btn{width:32%;padding:15px 0;font-size:16px;margin:5px 0;background:#2e7d32;color:#fff;border:none;border-radius:10px}
+  @keyframes attackLeft { 0%{transform:translateX(0)} 50%{transform:translateX(30px)} 100%{transform:translateX(0)} }
+  @keyframes shakeRight { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} }
+  @keyframes shakeScreen { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+  #fightWrap{max-width:420px;margin:0 auto}
+  .potions-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#2b1a0e;padding:6px;border:2px solid #5a3e22;border-radius:8px;margin-top:10px}
+  .potion-slot{background:linear-gradient(#4a3525,#2b1a0e);border:1px solid #8a6a3d;border-radius:4px;height:36px;display:flex;align-items:center;justify-content:center;color:#ffb84d;font-weight:bold;font-size:12px}
 </style>
 </head>
 <body>
+<div id="fightWrap">
 <div class="battle-names">
   <span>ТЫ ({{ lvl }} ур.)</span>
   <span id="battle-timer">20</span>
   <span>{{ enemy_type }}</span>
 </div>
+<div style="text-align:center;margin:10px"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
+<div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:24px">Приготовься к бою!</div>
 <div class="location_battle" id="arena">
-  <div><img src="/static/{{ player_img }}"><div>❤️ <span id="HeroLifeL">{{ my_hp }}</span> / {{ my_max_hp }}</div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:100%"></div></div></div>
-  <div><img src="/static/{{ enemy_img }}"><div><span id="HeroLifeR">{{ enemy_hp }}</span> / {{ enemy_max }} ❤️</div><div class="hp-bar"><div class="hp-fill" id="enBar" style="width:100%;background:linear-gradient(#ff6b6b,#c0392b)"></div></div></div>
+  <div class="fighter"><img id="heroImg" src="/static/{{ player_img }}"><div>❤️ <span id="myHp">{{ my_hp }}</span> / {{ my_max_hp }}</div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:{{ my_per }}%"></div></div></div>
+  <div class="fighter"><img id="enemyImg" src="/static/{{ enemy_img }}"><div><span id="enHp">{{ enemy_hp }}</span> / {{ enemy_max }} ❤️</div><div class="hp-bar"><div class="hp-fill" id="enBar" style="width:{{ enemy_per }}%;background:linear-gradient(#ff6b6b,#c0392b)"></div></div></div>
 </div>
 <div id="battle-log">Бой начался! Бей первым!</div>
 <div>
-  <button class="hit-btn" onclick="makeAction('hit')">👊 УДАР</button>
+  <button class="hit-btn" onclick="makeAction('hit')">👊 УДАР (<span id="hitCnt">{{ hit_cnt }}</span>/5)</button>
   <button class="hit-btn" style="background:#FFC107;color:#000" onclick="makeAction('super')">⚡ СУПЕР</button>
   <button class="hit-btn" style="background:#555" onclick="makeAction('run')">🏃 БЕГ</button>
 </div>
 <div id="battleLog" style="background:#1a0e0a;max-height:120px;overflow-y:auto;border:2px solid #5a3e22;border-radius:8px;margin:10px;padding:4px"></div>
+<div class="potions-bar"><div class="potion-slot">🍷 1</div><div class="potion-slot">🧪 2</div><div class="potion-slot">📜 3</div><div class="potion-slot">🛡️ 4</div><div class="potion-slot">⚡ 5</div></div>
+<a href="/promysel" style="display:block;color:#fff;margin-top:12px">← На промысел</a>
+</div>
+<div id="endOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px"><div style="background:linear-gradient(#3a2510,#1a0e0a);border:3px solid #ffcc00;border-radius:22px;padding:26px;width:100%;max-width:320px;text-align:center"><h2 id="endTitle" style="margin:0;color:gold;font-size:26px"></h2><div id="trophyBox" style="background:rgba(255,215,0,0.12);border:1.5px solid #c9a45c;border-radius:14px;padding:14px;margin:14px 0;font-size:16px;line-height:1.8;color:#ffe9a3"></div><a href="/promysel" style="display:block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:14px;border-radius:12px;font-weight:900;text-decoration:none">На промысел ➔</a></div></div>
 <script src="/static/game.js"></script>
 </body>
 </html>
