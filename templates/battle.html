@@ -1,420 +1,50 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Бой</title>
 <style>
-  :root {
-    --bg-dark: #120906;
-    --card-bg: linear-gradient(180deg, #2b1810 0%, #1a0e0a 100%);
-    --gold: #ffcc00;
-    --gold-dim: #8a6a3d;
-    --border-brown: #4a2e1b;
-    --text-main: #f5e6d3;
-  }
-
-  * {
-    box-sizing: border-box;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  body {
-    background: radial-gradient(circle at 50% 20%, #2d160c 0%, var(--bg-dark) 80%);
-    color: var(--text-main);
-    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 12px;
-    min-height: 100vh;
-  }
-
-  #fightWrap {
-    max-width: 420px;
-    margin: 0 auto;
-  }
-
-  /* Верхняя панель имен и таймера */
-  .battle-names {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--card-bg);
-    border: 1px solid var(--border-brown);
-    border-radius: 14px;
-    padding: 8px 14px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  }
-
-  .fighter-title {
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    max-width: 36%;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .fighter-title.player { color: #7cfc00; }
-  .fighter-title.enemy { color: #ff6b6b; }
-
-  #battle-timer {
-    font-size: 22px;
-    font-weight: 900;
-    color: var(--gold);
-    background: #140a07;
-    border: 2px solid var(--gold-dim);
-    padding: 4px 14px;
-    border-radius: 10px;
-    box-shadow: inset 0 0 8px rgba(0,0,0,0.8), 0 0 10px rgba(255, 204, 0, 0.15);
-    min-width: 54px;
-  }
-
-  /* Полоса таймера */
-  .timer-section {
-    margin: 10px 4px;
-  }
-
-  .timer-track {
-    height: 6px;
-    background: #140a07;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid #362013;
-  }
-
-  #timerBar {
-    height: 100%;
-    width: 100%;
-    background: linear-gradient(90deg, #ff9800, #ffeb3b);
-    box-shadow: 0 0 8px rgba(255, 204, 0, 0.6);
-    transition: width 0.2s linear;
-  }
-
-  #turnText {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gold);
-    margin-top: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-  }
-
-  /* Статус-баннер над ареной */
-  #log {
-    background: rgba(255, 204, 0, 0.08);
-    border-top: 1px solid rgba(255, 204, 0, 0.25);
-    border-bottom: 1px solid rgba(255, 204, 0, 0.25);
-    color: #ffe066;
-    font-size: 14px;
-    font-weight: 700;
-    padding: 6px 10px;
-    margin: 8px 0;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-  }
-
-  /* Арена бойцов */
-  .location_battle {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 10px;
-    margin: 14px 0;
-    position: relative;
-  }
-
-  .vs-badge {
-    font-size: 14px;
-    font-weight: 900;
-    color: var(--gold-dim);
-    background: #1a0e0a;
-    border: 1px solid var(--border-brown);
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-
-  .fighter {
-    flex: 1;
-    background: var(--card-bg);
-    border: 1.5px solid var(--border-brown);
-    border-radius: 16px;
-    padding: 10px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
-    transition: transform 0.2s;
-  }
-
-  .fighter img {
-    width: 110px;
-    height: 110px;
-    object-fit: cover;
-    border-radius: 12px;
-    border: 2px solid var(--gold-dim);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.7);
-    background: #0d0604;
-  }
-
-  .hp-text {
-    font-size: 13px;
-    font-weight: 700;
-    margin-top: 8px;
-    color: #fff;
-    text-shadow: 0 1px 2px #000;
-  }
-
-  .hp-bar {
-    height: 12px;
-    background: #120805;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-top: 5px;
-    border: 1px solid #3d2415;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
-  }
-
-  .hp-fill {
-    height: 100%;
-    background: linear-gradient(180deg, #8ce600 0%, #2e8b57 100%);
-    transition: width 0.35s ease-out;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
-  }
-
-  .hp-fill.enemy-hp {
-    background: linear-gradient(180deg, #ff6b6b 0%, #b71c1c 100%);
-  }
-
-  /* Текущее событие под ареной */
-  #battle-log {
-    font-size: 13px;
-    color: #d7bfa8;
-    margin-bottom: 10px;
-    font-style: italic;
-  }
-
-  /* Кнопки действий */
-  .actions-grid {
-    display: grid;
-    grid-template-columns: 1.2fr 1.1fr 0.8fr;
-    gap: 8px;
-    margin: 10px 0;
-  }
-
-  .hit-btn {
-    width: 100%;
-    padding: 14px 6px;
-    font-size: 14px;
-    font-weight: 800;
-    letter-spacing: 0.4px;
-    color: #fff;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: transform 0.08s, filter 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-  }
-
-  .hit-btn:active {
-    transform: translateY(3px);
-  }
-
-  .btn-attack {
-    background: linear-gradient(180deg, #43a047 0%, #1b5e20 100%);
-    border-bottom: 3px solid #0d3b10;
-    box-shadow: 0 4px 10px rgba(46, 125, 50, 0.35);
-  }
-
-  .btn-super {
-    background: linear-gradient(180deg, #ffd54f 0%, #f57f17 100%);
-    color: #1a0e0a;
-    border-bottom: 3px solid #a65100;
-    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.35);
-  }
-
-  .btn-run {
-    background: linear-gradient(180deg, #616161 0%, #373737 100%);
-    border-bottom: 3px solid #1f1f1f;
-    color: #e0e0e0;
-  }
-
-  /* Журнал боя */
-  #battleLog {
-    background: rgba(14, 7, 4, 0.85);
-    height: 115px;
-    overflow-y: auto;
-    border: 1.5px solid var(--border-brown);
-    border-radius: 12px;
-    margin: 12px 0;
-    padding: 8px 10px;
-    font-size: 12.5px;
-    line-height: 1.5;
-    text-align: left;
-    color: #e6d2be;
-    box-shadow: inset 0 3px 8px rgba(0,0,0,0.8);
-  }
-
-  #battleLog::-webkit-scrollbar { width: 5px; }
-  #battleLog::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 4px; }
-
-  /* Панель зелий */
-  .potions-bar {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-    background: var(--card-bg);
-    padding: 8px;
-    border: 1.5px solid var(--border-brown);
-    border-radius: 14px;
-    margin-top: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-  }
-
-  .potion-slot {
-    position: relative;
-    background: radial-gradient(circle at 50% 30%, #3d281a 0%, #1c1009 100%);
-    border: 1.5px solid var(--gold-dim);
-    border-radius: 10px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    cursor: pointer;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.7);
-    transition: transform 0.1s, border-color 0.2s;
-  }
-
-  .potion-slot:active {
-    transform: scale(0.93);
-    border-color: var(--gold);
-  }
-
-  .slot-key {
-    position: absolute;
-    bottom: 2px;
-    right: 5px;
-    font-size: 10px;
-    font-weight: 800;
-    color: #ffb84d;
-    text-shadow: 0 1px 2px #000;
-  }
-
-  /* Кнопка выхода */
-  .back-link {
-    display: inline-block;
-    color: #a88b72;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    margin-top: 14px;
-    padding: 6px 14px;
-    border-radius: 8px;
-    transition: color 0.2s, background 0.2s;
-  }
-
-  .back-link:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.06);
-  }
-
-  /* Анимации */
+  body{background:#1a0e0a;color:#fff;font-family:Arial;text-align:center;margin:0;padding:10px}
+  .battle-names{display:flex;justify-content:space-between;align-items:center;font-size:18px;font-weight:bold}
+  #battle-timer{font-size:28px;background:#333;padding:5px 15px;border-radius:10px}
+  .location_battle{display:flex;justify-content:space-between;margin:20px 0;position:relative}
+  .fighter img{width:120px;height:120px;object-fit:cover;border-radius:10px;border:2px solid #555}
+  .hp-bar{height:12px;background:#333;border-radius:6px;overflow:hidden;margin-top:5px}
+  .hp-fill{height:100%;background:linear-gradient(#7CFC00,#2E8B57);transition:width .3s}
+  .hit-btn{width:32%;padding:15px 0;font-size:16px;margin:5px 0;background:#2e7d32;color:#fff;border:none;border-radius:10px}
   @keyframes attackLeft { 0%{transform:translateX(0)} 50%{transform:translateX(30px)} 100%{transform:translateX(0)} }
   @keyframes shakeRight { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} }
   @keyframes shakeScreen { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
-
-  /* Модальное окно конца боя */
-  #endOverlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(8, 4, 2, 0.9);
-    backdrop-filter: blur(4px);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    padding: 20px;
-  }
-
-  .end-modal {
-    background: linear-gradient(180deg, #3a2312 0%, #1a0e0a 100%);
-    border: 2px solid var(--gold);
-    border-radius: 22px;
-    padding: 26px 22px;
-    width: 100%;
-    max-width: 330px;
-    text-align: center;
-    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.9), 0 0 25px rgba(255, 204, 0, 0.2);
-  }
-
-  #endTitle {
-    margin: 0;
-    color: var(--gold);
-    font-size: 26px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
-  }
-
-  #trophyBox {
-    background: rgba(255, 215, 0, 0.08);
-    border: 1px solid var(--gold-dim);
-    border-radius: 14px;
-    padding: 14px;
-    margin: 16px 0;
-    font-size: 15px;
-    line-height: 1.7;
-    color: #ffe9a3;
-  }
-
-  .end-btn {
-    display: block;
-    background: linear-gradient(180deg, #ffd54f 0%, #d49b27 100%);
-    color: #1a0e0a;
-    padding: 14px;
-    border-radius: 12px;
-    font-weight: 900;
-    font-size: 15px;
-    text-transform: uppercase;
-    text-decoration: none;
-    border-bottom: 3px solid #8c6211;
-    box-shadow: 0 4px 15px rgba(255, 204, 0, 0.3);
-  }
+  #fightWrap{max-width:420px;margin:0 auto}
+  .potions-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#2b1a0e;padding:6px;border:2px solid #5a3e22;border-radius:8px;margin-top:10px}
+  .potion-slot{background:linear-gradient(#4a3525,#2b1a0e);border:1px solid #8a6a3d;border-radius:4px;height:36px;display:flex;align-items:center;justify-content:center;color:#ffb84d;font-weight:bold;font-size:12px}
 </style>
 </head>
 <body>
-
 <div id="fightWrap">
-  <div class="battle-names">
-    <span class="fighter-title player">ТЫ ({{ lvl }} ур.)</span>
-    <span id="battle-timer">20</span>
-    <span class="fighter-title enemy">{{ enemy_type }}</span>
-  </div>
-
-  <div class="timer-section">
-    <div class="timer-track">
-      <div id="timerBar"></div>
-    </div>
-    <div id="turnText">Твой ход! 20 сек</div>
-  </div>
-
-  <div id="log">Приготовься к бою!</div>
-
-  <div class="location_battle" id="arena">
-    <div class="fighter">
-      <img id="heroImg" src="/static/{{ player_img }}" alt="Герой">
-      <div class="hp-text">❤️ <span id="myHp">{{ my_hp }}</span> / {{ my_max_hp }}</div>
-      <div class="hp-bar">
-        <div class="hp-fill" id="myBar" style="width:{{ my_per }}%"></div>
-      </div>
+<div class="battle-names">
+  <span>ТЫ ({{ lvl }} ур.)</span>
+  <span id="battle-timer">20</span>
+  <span>{{ enemy_type }}</span>
+</div>
+<div style="text-align:center;margin:10px"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
+<div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:24px">Приготовься к бою!</div>
+<div class="location_battle" id="arena">
+  <div class="fighter"><img id="heroImg" src="/static/{{ player_img }}"><div>❤️ <span id="myHp">{{ my_hp }}</span> / {{ my_max_hp }}</div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:{{ my_per }}%"></div></div></div>
+  <div class="fighter"><img id="enemyImg" src="/static/{{ enemy_img }}"><div><span id="enHp">{{ enemy_hp }}</span> / {{ enemy_max }} ❤️</div><div class="hp-bar"><div class="hp-fill" id="enBar" style="width:{{ enemy_per }}%;background:linear-gradient(#ff6b6b,#c0392b)"></div></div></div>
+</div>
+<div id="battle-log">Бой начался! Бей первым!</div>
+<div>
+  <button class="hit-btn" onclick="makeAction('hit')">👊 УДАР (<span id="hitCnt">{{ hit_cnt }}</span>/5)</button>
+  <button class="hit-btn" style="background:#FFC107;color:#000" onclick="makeAction('super')">⚡ СУПЕР</button>
+  <button class="hit-btn" style="background:#555" onclick="makeAction('run')">🏃 БЕГ</button>
+</div>
+<div id="battleLog" style="background:#1a0e0a;max-height:120px;overflow-y:auto;border:2px solid #5a3e22;border-radius:8px;margin:10px;padding:4px"></div>
+<div class="potions-bar"><div class="potion-slot">🍷 1</div><div class="potion-slot">🧪 2</div><div class="potion-slot">📜 3</div><div class="potion-slot">🛡️ 4</div><div class="potion-slot">⚡ 5</div></div>
+<a href="/promysel" style="display:block;color:#fff;margin-top:12px">← На промысел</a>
+</div>
+<div id="endOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px"><div style="background:linear-gradient(#3a2510,#1a0e0a);border:3px solid #ffcc00;border-radius:22px;padding:26px;width:100%;max-width:320px;text-align:center"><h2 id="endTitle" style="margin:0;color:gold;font-size:26px"></h2><div id="trophyBox" style="background:rgba(255,215,0,0.12);border:1.5px solid #c9a45c;border-radius:14px;padding:14px;margin:14px 0;font-size:16px;line-height:1.8;color:#ffe9a3"></div><a href="/promysel" style="display:block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:14px;border-radius:12px;font-weight:900;text-decoration:none">На промысел ➔</a></div></div>
+<script src="/static/game.js"></script>
+</body>
+</html>
