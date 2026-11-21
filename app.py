@@ -325,11 +325,11 @@ def _monster_cards(monsters, loc_code):
 def promysel():
     if "uid" not in session: return redirect("/")
     MONSTERS = get_monsters()
-    p = get_player(session["uid"]); l, h, r, g, s = vals(p)
-    top = f'<div style="background:#e8d6a8;padding:8px;display:flex;justify-content:center"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:16px;padding:6px 14px;display:flex;gap:14px;font-weight:bold"><span>⭐ {l}</span><span>❤️ {h}</span><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div></div>'
-    cards = _monster_cards(MONSTERS, "promysel")
-    if not cards: cards = '<p style="text-align:center">В Промыселе пока нет монстров</p>'
-    body = top + f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел - ОХОТА НА МОНСТРОВ</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
+    cur = session.get("current_loc", "lager")
+    cards = _monster_cards(MONSTERS, cur)
+    if not cards:
+        cards = '<p style="text-align:center">В этой локации пока нет монстров. Админ может добавить!</p>'
+    body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
     return render_page(body, True)
 
 @app.route("/loc/<code>")
@@ -338,11 +338,10 @@ def go_loc(code):
     if code == "promysel": return redirect("/promysel")
     if code not in LOCATIONS: return redirect("/game")
     session["current_loc"] = code
-    MONSTERS = get_monsters()
-    cards = _monster_cards(MONSTERS, code)
-    if not cards: cards = '<p style="text-align:center">В этой локации пока нет монстров. Админ может добавить!</p>'
     loc_name = LOCATIONS[code]["name"]
-    body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
+    # ВАЖНО: на странице локации монстров НЕ показываем!
+    # Монстры только в Промыселе
+    body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3><p style="text-align:center">Ты в локации {loc_name}. Монстры ждут тебя в Промыселе!</p><a href="/promysel" class="btn-orange">🌲 Промысел — тут монстры</a><a href="/game" class="btn-orange">← На главную</a><a href="/map" class="btn-orange">📍 Карта</a></div>'
     return render_page(body, True)
 
 @app.route("/fight/<monster>")
