@@ -505,7 +505,7 @@ def fight_battle():
         if m == "shield" and cur_my > 0 and cur_en > 0:
             f["shield_active"] = True
             edmg = enemy_hit()
-                elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
+        elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
             # ТОЛЬКО ход монстра, отдельно от твоего
             if f.get("shield_active"):
                 edmg = 0
@@ -516,8 +516,8 @@ def fight_battle():
             dmg = 0
         elif m == "hit" and cur_my > 0 and cur_en > 0:
             # ТОЛЬКО твой ход, монстр пока НЕ бьёт
-            dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1
-            edmg = 0
+                dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1
+                edmg = 0
         elif m == "super" and cur_my > 0 and cur_en > 0 and super_used < 4 and super_hits >= 5:
             # ТОЛЬКО твой супер, без ответки
             dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0
