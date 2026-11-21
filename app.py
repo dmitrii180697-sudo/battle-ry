@@ -505,20 +505,23 @@ def fight_battle():
         if m == "shield" and cur_my > 0 and cur_en > 0:
             f["shield_active"] = True
             edmg = enemy_hit()
-        elif m == "enemy_auto":
+                elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
+            # ТОЛЬКО ход монстра, отдельно от твоего
             if f.get("shield_active"):
                 edmg = 0
                 f["shield_active"] = False
             else:
-                edmg = random.randint(2, 6); cur_my = max(0, cur_my - edmg)
+                edmg = random.randint(int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4)))
+                cur_my = max(0, cur_my - edmg)
+            dmg = 0
         elif m == "hit" and cur_my > 0 and cur_en > 0:
+            # ТОЛЬКО твой ход, монстр пока НЕ бьёт
             dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1
-            if cur_en > 0:
-                edmg = enemy_hit()
+            edmg = 0
         elif m == "super" and cur_my > 0 and cur_en > 0 and super_used < 4 and super_hits >= 5:
+            # ТОЛЬКО твой супер, без ответки
             dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0
-            if cur_en > 0:
-                edmg = enemy_hit()
+            edmg = 0
         f["enemy_hp"] = cur_en; f["my_hp"] = cur_my; f["hit_count"] = hit_cnt
         f["super_used"] = super_used; f["super_hits"] = super_hits; f["last_seen"] = int(time.time())
         save_fight_db(uid, f)
