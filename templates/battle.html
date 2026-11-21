@@ -38,8 +38,8 @@
   <div style="text-align:center;margin:8px 0 0"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00;transition:width .2s"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
 
   <div style="display:flex;gap:10px;margin-top:6px">
-    <div style="flex:1;text-align:left"><div class="hp-row"><span>ВЫ</span><span><span id="myHp">{{ my_hp|default(20) }}</span> / {{ my_max_hp|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:{{ my_per|default(100) }}%"></div></div></div>
-    <div style="flex:1;text-align:right"><div class="hp-row"><span>{{ enemy_type|default('Враг') }}</span><span><span id="enHp">{{ enemy_hp|default(20) }}</span> / {{ enemy_max|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill enemy" id="enBar" style="width:{{ enemy_per|default(100) }}%"></div></div></div>
+    <div style="flex:1;text-align:left"><div class="hp-row"><span>ВЫ</span><span><span id="myHp">{{ my_hp|default(20) }}</span> / {{ my_max_hp|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill" id="myBar" data-per="{{ my_per|default(100) }}"></div></div></div>
+    <div style="flex:1;text-align:right"><div class="hp-row"><span>{{ enemy_type|default('Враг') }}</span><span><span id="enHp">{{ enemy_hp|default(20) }}</span> / {{ enemy_max|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill enemy" id="enBar" data-per="{{ enemy_per|default(100) }}"></div></div></div>
   </div>
 
   <div class="arena" id="arena">

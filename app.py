@@ -868,7 +868,7 @@ def admin():
         loc_sel = "".join([f'<option value="{k}" {"selected" if m.get("location","promysel")==k else ""}>{v["name"]}</option>' for k,v in LOCATIONS.items()])
         monsters_html += f'''
         <form method="post" style="background:#fff3cd;border:2px solid #c9a45c;border-radius:10px;padding:12px;margin:10px 0">
-          <b>👹 {m["name"]} ({key}) — 📍 {LOCATIONS.get(m.get("location","promysel"),{{}}).get("name","?")}</b><br>
+          <b>👹 {m["name"]} ({key}) — 📍 {LOCATIONS.get(m.get("location","promysel"),dict()).get("name","?")}</b><br>
           <input type="hidden" name="action" value="edit_monster">
           <input type="hidden" name="mkey" value="{key}">
           HP монстра: <input name="m_hp" type="number" value="{m["hp"]}">
