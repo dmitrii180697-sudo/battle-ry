@@ -58,12 +58,86 @@ def init_db():
         if DATABASE_URL:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
             cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            # === БОЙ: таблица для незавершённых боёв ===
+            cur.execute("CREATE TABLE IF NOT EXISTS fights (uid INT PRIMARY KEY, enemy TEXT, enemy_hp INT, enemy_max INT, enemy_dmg_min INT, enemy_dmg_max INT, enemy_img TEXT, enemy_name TEXT, my_hp INT, hit_count INT DEFAULT 0, super_used INT DEFAULT 0, super_hits INT DEFAULT 0, shield_active BOOLEAN DEFAULT FALSE, reward_g INT DEFAULT 0, reward_s INT DEFAULT 0, reward_r INT DEFAULT 0, last_seen BIGINT DEFAULT 0)")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INTEGER DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
             cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
+            cur.execute("CREATE TABLE IF NOT EXISTS fights (uid INTEGER PRIMARY KEY, enemy TEXT, enemy_hp INTEGER, enemy_max INTEGER, enemy_dmg_min INTEGER, enemy_dmg_max INTEGER, enemy_img TEXT, enemy_name TEXT, my_hp INTEGER, hit_count INTEGER DEFAULT 0, super_used INTEGER DEFAULT 0, super_hits INTEGER DEFAULT 0, shield_active INTEGER DEFAULT 0, reward_g INTEGER DEFAULT 0, reward_s INTEGER DEFAULT 0, reward_r INTEGER DEFAULT 0, last_seen INTEGER DEFAULT 0)")
         conn.commit(); cur.close(); conn.close()
     except Exception as e: print(f"DB INIT ERROR: {e}")
 init_db()
+
+# ===== ФУНКЦИИ БОЯ (сохранение в БД, бой продолжается офлайн) =====
+def get_fight_db(uid):
+    if not uid: return None
+    try:
+        conn = get_db(); cur = conn.cursor()
+        q = "SELECT * FROM fights WHERE uid=%s" if DATABASE_URL else "SELECT * FROM fights WHERE uid=?"
+        cur.execute(q, (uid,))
+        row = cur.fetchone(); cur.close(); conn.close()
+        if not row: return None
+        # RealDictCursor / sqlite Row -> dict
+        if isinstance(row, dict): return dict(row)
+        try: return dict(row)
+        except: return {"uid": row[0], "enemy": row[1], "enemy_hp": row[2], "enemy_max": row[3], "enemy_dmg_min": row[4], "enemy_dmg_max": row[5], "enemy_img": row[6], "enemy_name": row[7], "my_hp": row[8], "hit_count": row[9], "super_used": row[10], "super_hits": row[11], "shield_active": row[12], "reward_g": row[13], "reward_s": row[14], "reward_r": row[15], "last_seen": row[16]}
+    except Exception as e:
+        print(f"get_fight error {e}"); return None
+
+def save_fight_db(uid, data):
+    try:
+        conn = get_db(); cur = conn.cursor()
+        if DATABASE_URL:
+            cur.execute("INSERT INTO fights (uid, enemy, enemy_hp, enemy_max, enemy_dmg_min, enemy_dmg_max, enemy_img, enemy_name, my_hp, hit_count, super_used, super_hits, shield_active, reward_g, reward_s, reward_r, last_seen) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (uid) DO UPDATE SET enemy=EXCLUDED.enemy, enemy_hp=EXCLUDED.enemy_hp, enemy_max=EXCLUDED.enemy_max, enemy_dmg_min=EXCLUDED.enemy_dmg_min, enemy_dmg_max=EXCLUDED.enemy_dmg_max, enemy_img=EXCLUDED.enemy_img, enemy_name=EXCLUDED.enemy_name, my_hp=EXCLUDED.my_hp, hit_count=EXCLUDED.hit_count, super_used=EXCLUDED.super_used, super_hits=EXCLUDED.super_hits, shield_active=EXCLUDED.shield_active, reward_g=EXCLUDED.reward_g, reward_s=EXCLUDED.reward_s, reward_r=EXCLUDED.reward_r, last_seen=EXCLUDED.last_seen",
+                (uid, data.get("enemy"), data.get("enemy_hp"), data.get("enemy_max"), data.get("enemy_dmg_min",2), data.get("enemy_dmg_max",4), data.get("enemy_img"), data.get("enemy_name"), data.get("my_hp"), data.get("hit_count",0), data.get("super_used",0), data.get("super_hits",0), bool(data.get("shield_active", False)), data.get("reward_g",0), data.get("reward_s",0), data.get("reward_r",0), int(data.get("last_seen", time.time()))))
+        else:
+            cur.execute("INSERT OR REPLACE INTO fights (uid, enemy, enemy_hp, enemy_max, enemy_dmg_min, enemy_dmg_max, enemy_img, enemy_name, my_hp, hit_count, super_used, super_hits, shield_active, reward_g, reward_s, reward_r, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (uid, data.get("enemy"), data.get("enemy_hp"), data.get("enemy_max"), data.get("enemy_dmg_min",2), data.get("enemy_dmg_max",4), data.get("enemy_img"), data.get("enemy_name"), data.get("my_hp"), data.get("hit_count",0), data.get("super_used",0), data.get("super_hits",0), 1 if data.get("shield_active") else 0, data.get("reward_g",0), data.get("reward_s",0), data.get("reward_r",0), int(data.get("last_seen", time.time()))))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e: print(f"save_fight error {e}")
+
+def clear_fight_db(uid):
+    try:
+        conn = get_db(); cur = conn.cursor()
+        q = "DELETE FROM fights WHERE uid=%s" if DATABASE_URL else "DELETE FROM fights WHERE uid=?"
+        cur.execute(q, (uid,)); conn.commit(); cur.close(); conn.close()
+    except: pass
+
+def apply_offline_damage(uid, fight):
+    # Монстр бьёт каждые 8 секунд, пока игрока нет. Максимум 5 ударов за одно возвращение.
+    if not fight: return fight
+    now = int(time.time())
+    last = int(fight.get("last_seen") or now)
+    passed = now - last
+    if passed < 8: return fight
+    hits = min(passed // 8, 5)
+    dmg_total = 0
+    for _ in range(hits):
+        dmg_total += random.randint(int(fight.get("enemy_dmg_min",2)), int(fight.get("enemy_dmg_max",4)))
+    # если был щит - один удар блокируется
+    if fight.get("shield_active"):
+        dmg_total = max(0, dmg_total - random.randint(int(fight.get("enemy_dmg_min",2)), int(fight.get("enemy_dmg_max",4))))
+        fight["shield_active"] = False
+    fight["my_hp"] = max(0, int(fight.get("my_hp",20)) - dmg_total)
+    fight["last_seen"] = now
+    fight["_offline_dmg"] = dmg_total
+    fight["_offline_hits"] = hits
+    return fight
+
+# === ЗАПРЕТ ВЫХОДА ИЗ БОЯ ===
+@app.before_request
+def block_exit_during_fight():
+    # Разрешённые маршруты во время боя
+    allowed = {"static_files", "fight", "fight_battle", "root", "login", "reg", None}
+    # static
+    if request.path.startswith("/static/"): return None
+    if "uid" not in session: return None
+    if request.endpoint in allowed: return None
+    # если есть активный бой - обратно в бой
+    f = get_fight_db(session.get("uid"))
+    if f and int(f.get("enemy_hp", 1)) > 0 and int(f.get("my_hp", 1)) > 0:
+        return redirect("/fight_battle")
+    return None
 
 def get_monsters():
     data = load_json("monsters")
@@ -128,6 +202,10 @@ def vals(p):
 def add_win(uid):
     try:
         rg = session.get("reward_g", 0); rs = session.get("reward_s", 0); rr = session.get("reward_r", 0)
+        # если награда в бое из БД - берём оттуда
+        f = get_fight_db(uid)
+        if f:
+            rg = int(f.get("reward_g", rg or 0)); rs = int(f.get("reward_s", rs or 0)); rr = int(f.get("reward_r", rr or 0))
         conn = get_db(); cur = conn.cursor()
         if DATABASE_URL:
             cur.execute("UPDATE players SET wins=COALESCE(wins,0)+1, gold=COALESCE(gold,0)+%s, silver=COALESCE(silver,0)+%s, rubin=COALESCE(rubin,0)+%s, exp=COALESCE(exp,0)+10 WHERE id=%s",(rg, rs, rr, uid))
@@ -143,6 +221,7 @@ def add_win(uid):
         if DATABASE_URL: cur.execute("UPDATE players SET level=%s WHERE id=%s",(new_lvl, uid))
         else: cur.execute("UPDATE players SET level=? WHERE id=?",(new_lvl, uid))
         conn.commit(); cur.close(); conn.close(); convert_silver(uid)
+        clear_fight_db(uid)
     except Exception as e: print(f"add_win error {e}")
 
 def add_loss(uid):
@@ -151,6 +230,7 @@ def add_loss(uid):
         if DATABASE_URL: cur.execute("UPDATE players SET losses=COALESCE(losses,0)+1 WHERE id=%s",(uid,))
         else: cur.execute("UPDATE players SET losses=COALESCE(losses,0)+1 WHERE id=?",(uid,))
         conn.commit(); cur.close(); conn.close()
+        clear_fight_db(uid)
     except: pass
 
 BASE_CSS = """
@@ -219,6 +299,9 @@ def login():
         uid = row["id"] if isinstance(row, dict) or hasattr(row,'get') else row[0]
         if check_password_hash(hpw, pw):
             session["uid"] = uid; session["my_hp"] = 20; session["current_loc"] = "lager"
+            # если был незавершённый бой - сразу в бой
+            if get_fight_db(uid):
+                return redirect("/fight_battle")
             return redirect("/game")
     return "Неверный пароль <a href='/'>назад</a>"
 
@@ -312,6 +395,7 @@ def game():
 
 @app.route("/logout")
 def logout():
+    # ВАЖНО: бой НЕ удаляем! Если вышел во время боя - бой продолжится, при следующем входе кикнет обратно в бой
     session.clear(); return redirect("/")
 
 def _monster_cards(monsters, loc_code):
@@ -339,17 +423,29 @@ def go_loc(code):
     if code not in LOCATIONS: return redirect("/game")
     session["current_loc"] = code
     loc_name = LOCATIONS[code]["name"]
-    # ВАЖНО: на странице локации монстров НЕ показываем!
-    # Монстры только в Промыселе
     body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3><a href="/game" class="btn-orange">← На главную</a><a href="/map" class="btn-orange">📍 Карта</a></div>'
     return render_page(body, True)
 
 @app.route("/fight/<monster>")
 def fight(monster):
     if "uid" not in session: return redirect("/")
+    # если уже есть бой - в него, новый не создаём
+    existing = get_fight_db(session["uid"])
+    if existing and int(existing.get("enemy_hp", 0)) > 0 and int(existing.get("my_hp", 0)) > 0:
+        return redirect("/fight_battle")
     MONSTERS = get_monsters()
     p = get_player(session["uid"]); l, h, r, g, s_ = vals(p)
     cfg = MONSTERS.get(monster, MONSTERS["warrior"])
+    # сохраняем бой в БД
+    save_fight_db(session["uid"], {
+        "enemy": monster, "enemy_hp": cfg.get("hp", 20), "enemy_max": cfg.get("hp", 20),
+        "enemy_dmg_min": cfg.get("dmg", [2,4])[0], "enemy_dmg_max": cfg.get("dmg", [2,4])[1],
+        "enemy_img": cfg.get("img", "ancient_warrior.png"), "enemy_name": cfg["name"],
+        "my_hp": h, "hit_count": 0, "super_used": 0, "super_hits": 0, "shield_active": False,
+        "reward_g": cfg.get("gold", 2), "reward_s": cfg.get("silver", 10), "reward_r": cfg.get("rubin", 0),
+        "last_seen": int(time.time())
+    })
+    # для совместимости со старым кодом - дублируем в session
     session["enemy_type"] = cfg["name"]; session["enemy_hp"] = cfg.get("hp", 20); session["enemy_max"] = cfg.get("hp", 20)
     session["enemy_dmg"] = cfg.get("dmg", [2,4]); session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
     session["my_hp"] = h; session["hit_count"] = 0; session["rewarded"] = False
@@ -362,31 +458,57 @@ def fight(monster):
 @app.route("/fight_battle", methods=["GET", "POST"])
 def fight_battle():
     if "uid" not in session: return redirect("/")
-    if "enemy_hp" not in session: return redirect("/promysel")
-    p = get_player(session["uid"]); lvl, my_max_hp, rubin, gold, silver = vals(p)
+    uid = session["uid"]
+    # бой берём из БД - он главный
+    f = get_fight_db(uid)
+    if not f:
+        # нет боя в БД - пробуем старый session-бой, если его нет - в промысел
+        if "enemy_hp" not in session: return redirect("/promysel")
+        f = {"enemy": "warrior", "enemy_hp": session.get("enemy_hp", 20), "enemy_max": session.get("enemy_max", 20), "enemy_dmg_min": session.get("enemy_dmg", [2,4])[0], "enemy_dmg_max": session.get("enemy_dmg", [2,4])[1], "enemy_img": session.get("enemy_img", "ancient_warrior.png"), "enemy_name": session.get("enemy_type", "Древний Воин"), "my_hp": session.get("my_hp", 20), "hit_count": session.get("hit_count", 0), "super_used": session.get("super_used", 0), "super_hits": session.get("super_hits", 0), "shield_active": session.get("shield_active", False), "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0), "last_seen": int(time.time())}
+        save_fight_db(uid, f)
+    # === бой продолжается пока тебя нет ===
+    f = apply_offline_damage(uid, f)
+    if int(f.get("my_hp", 1)) <= 0:
+        # умер пока был офлайн
+        add_loss(uid)
+        # clear уже в add_loss, но session тоже чистим
+        session.pop("enemy_hp", None)
+        return redirect("/game")
+    # сохраняем обновлённое время
+    f["last_seen"] = int(time.time())
+    save_fight_db(uid, f)
+    # синхронизируем session для шаблона
+    session["enemy_hp"] = int(f["enemy_hp"]); session["my_hp"] = int(f["my_hp"]); session["hit_count"] = int(f.get("hit_count",0))
+    session["super_used"] = int(f.get("super_used",0)); session["super_hits"] = int(f.get("super_hits",0)); session["shield_active"] = bool(f.get("shield_active"))
+    session["reward_g"] = int(f.get("reward_g",0)); session["reward_s"] = int(f.get("reward_s",0)); session["reward_r"] = int(f.get("reward_r",0))
+    session["enemy_type"] = f.get("enemy_name"); session["enemy_img"] = f.get("enemy_img"); session["enemy_max"] = int(f.get("enemy_max",20))
+
+    p = get_player(uid); lvl, my_max_hp, rubin, gold, silver = vals(p)
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
         m = data.get("m") or request.form.get("m", "hit")
-        if m == "run": return jsonify({"status": "redirect", "url": "/promysel"})
-        cur_my = session.get("my_hp", my_max_hp); cur_en = session.get("enemy_hp", 20); hit_cnt = session.get("hit_count", 0)
-        super_used = session.get("super_used", 0); super_hits = session.get("super_hits", 0)
+        # === ВЫХОД ИЗ БОЯ ЗАПРЕЩЁН ===
+        if m == "run":
+            return jsonify({"status": "blocked", "msg": "⛔ Из боя нельзя выйти! Бейся до конца!", "enemy_hp": int(f["enemy_hp"]), "my_hp": int(f["my_hp"]), "finished": False})
+        cur_my = int(f["my_hp"]); cur_en = int(f["enemy_hp"]); hit_cnt = int(f.get("hit_count",0))
+        super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
         dmg = 0; edmg = 0
         def enemy_hit():
             nonlocal cur_my
-            if session.get("shield_active"):
-                session["shield_active"] = False
+            if f.get("shield_active"):
+                f["shield_active"] = False
                 return 0
-            emin, emax = session.get("enemy_dmg", [2,5])
+            emin, emax = int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4))
             d = random.randint(emin, emax)
             cur_my = max(0, cur_my - d)
             return d
         if m == "shield" and cur_my > 0 and cur_en > 0:
-            session["shield_active"] = True
+            f["shield_active"] = True
             edmg = enemy_hit()
         elif m == "enemy_auto":
-            if session.get("shield_active"):
+            if f.get("shield_active"):
                 edmg = 0
-                session["shield_active"] = False
+                f["shield_active"] = False
             else:
                 edmg = random.randint(2, 6); cur_my = max(0, cur_my - edmg)
         elif m == "hit" and cur_my > 0 and cur_en > 0:
@@ -397,18 +519,23 @@ def fight_battle():
             dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0
             if cur_en > 0:
                 edmg = enemy_hit()
+        f["enemy_hp"] = cur_en; f["my_hp"] = cur_my; f["hit_count"] = hit_cnt
+        f["super_used"] = super_used; f["super_hits"] = super_hits; f["last_seen"] = int(time.time())
+        save_fight_db(uid, f)
         session["enemy_hp"] = cur_en; session["my_hp"] = cur_my; session["hit_count"] = hit_cnt
         session["super_used"] = super_used; session["super_hits"] = super_hits; session.modified = True
         need_for_next = 0 if super_used >= 4 else (5 - super_hits)
         finished = False; is_win = False
-        if cur_en <= 0 and not session.get("rewarded"):
-            add_win(session["uid"]); session["rewarded"] = True; finished = True; is_win = True
-        elif cur_my <= 0 and not session.get("rewarded"):
-            add_loss(session["uid"]); session["rewarded"] = True; finished = True; is_win = False
-        return jsonify({"enemy_hp": cur_en, "enemy_max": session.get("enemy_max", 20), "my_hp": cur_my, "my_max": my_max_hp, "hit_cnt": hit_cnt, "last_dmg": dmg, "edmg": edmg, "finished": finished, "is_win": is_win, "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0), "super_used": super_used, "need_for_next": need_for_next})
-    cur_enemy_hp = session.get("enemy_hp", 20); enemy_max_hp = session.get("enemy_max", 20); cur_my_hp = session.get("my_hp", my_max_hp); hit_cnt = session.get("hit_count", 0)
-    enemy_name = session.get("enemy_type", "Древний Воин"); enemy_img = session.get("enemy_img", "ancient_warrior.png")
-    super_used = session.get("super_used", 0); super_hits = session.get("super_hits", 0)
+        if cur_en <= 0:
+            # победа - очищаем бой, теперь можно выйти
+            session["reward_g"] = int(f.get("reward_g",0)); session["reward_s"] = int(f.get("reward_s",0)); session["reward_r"] = int(f.get("reward_r",0))
+            add_win(uid); session["rewarded"] = True; finished = True; is_win = True
+        elif cur_my <= 0:
+            add_loss(uid); session["rewarded"] = True; finished = True; is_win = False
+        return jsonify({"enemy_hp": cur_en, "enemy_max": int(f.get("enemy_max",20)), "my_hp": cur_my, "my_max": my_max_hp, "hit_cnt": hit_cnt, "last_dmg": dmg, "edmg": edmg, "finished": finished, "is_win": is_win, "reward_g": int(f.get("reward_g",0)), "reward_s": int(f.get("reward_s",0)), "reward_r": int(f.get("reward_r",0)), "super_used": super_used, "need_for_next": need_for_next})
+    cur_enemy_hp = int(f["enemy_hp"]); enemy_max_hp = int(f.get("enemy_max",20)); cur_my_hp = int(f["my_hp"]); hit_cnt = int(f.get("hit_count",0))
+    enemy_name = f.get("enemy_name", "Древний Воин"); enemy_img = f.get("enemy_img", "ancient_warrior.png")
+    super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
     need_for_next = 0 if super_used >= 4 else (5 - super_hits)
     my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0; enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
     return render_template("battle.html",
@@ -556,7 +683,6 @@ def shop_cat(cat):
     if "uid" not in session: return redirect("/")
     names={"weapon":"🗡️ Оружие","armor":"🛡️ Броня","potion":"🧪 Зелья и Свитки","amulet":"🔮 Амулеты","misc":"📦 Разное","auction":"🏆 Аукцион","sell":"💰 Продать","chars":"🧝 Персонажи"}
     title=names.get(cat,"Магазин")
-    # Товары берём из data/shop.json - свежие каждый раз
     shop_data = load_json("shop")
     items = shop_data.get(cat, [])
     if not items:
