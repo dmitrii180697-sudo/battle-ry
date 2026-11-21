@@ -1,4 +1,22 @@
 {
-  "warrior": {"name": "Древний воин", "img": "ancient_warrior.png", "hp": 20, "dmg": [2, 4], "gold": 2, "silver": 10, "rubin": 0, "location": "promysel"},
-  "beast": {"name": "Дух зверя", "img": "spirit_wolf_left.png", "hp": 100, "dmg": [4, 7], "gold": 5, "silver": 20, "rubin": 1, "location": "promysel"}
+  "warrior": {
+    "name": "Древний воин",
+    "img": "ancient_warrior.png",
+    "hp": 20,
+    "dmg": [2, 4],
+    "gold": 2,
+    "silver": 10,
+    "rubin": 0,
+    "location": "lager"
+  },
+  "beast": {
+    "name": "Дух зверя",
+    "img": "spirit_wolf_left.png",
+    "hp": 100,
+    "dmg": [4, 7],
+    "gold": 5,
+    "silver": 20,
+    "rubin": 1,
+    "location": "lager"
+  }
 }
