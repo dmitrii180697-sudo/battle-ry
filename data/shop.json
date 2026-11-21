@@ -1,5 +1,18 @@
 {
-  "shield_wood": {"name": "Деревянный щит", "price": 100, "block": 5},
-  "sword_1": {"name": "Меч новичка", "price": 150, "dmg": 10},
-  "potion": {"name": "Зелье здоровья", "price": 50, "heal": 50}
+  "weapon": [
+    {"id": "sword_1", "name": "🗡️ Ржавый меч", "desc": "Слабый, но лучше чем кулаки", "gold": 5, "silver": 0, "rubin": 0},
+    {"id": "sword_2", "name": "⚔️ Стальной меч", "desc": "Крепкий меч воина", "gold": 20, "silver": 0, "rubin": 0},
+    {"id": "axe_1", "name": "🪓 Боевой топор", "desc": "Тяжёлый и страшный", "gold": 0, "silver": 0, "rubin": 2}
+  ],
+  "armor": [
+    {"id": "armor_1", "name": "🛡️ Кожаная броня", "desc": "+1 к защите", "gold": 10, "silver": 0, "rubin": 0}
+  ],
+  "potion": [
+    {"id": "potion_1", "name": "🧪 Зелье жизни", "desc": "Восстанавливает HP", "gold": 3, "silver": 0, "rubin": 0}
+  ],
+  "amulet": [],
+  "misc": [],
+  "auction": [],
+  "sell": [],
+  "chars": []
 }

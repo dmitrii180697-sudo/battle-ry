@@ -21,7 +21,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# ===== ДАННЫЕ ИЗ ПАПКИ data/ =====
+# ===== ДАННЫЕ ИЗ ПАПКИ data/ - ЕДИНЫЙ ИСТОЧНИК ПРАВДЫ =====
 def load_json(name):
     path = os.path.join(os.path.dirname(__file__), "data", f"{name}.json")
     try:
@@ -30,12 +30,18 @@ def load_json(name):
     except FileNotFoundError:
         return {}
 
+def save_json(name, data):
+    path = os.path.join(os.path.dirname(__file__), "data", f"{name}.json")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 LOCATIONS = load_json("locations")
-# Монстры по умолчанию - из файла, если файла нет - берём 2 базовых
 DEFAULT_MONSTERS = load_json("monsters") or {
     "warrior": {"name": "Древний воин", "img": "ancient_warrior.png", "hp": 20, "dmg": [2,4], "gold": 2, "silver": 10, "rubin": 0, "location": "promysel"},
     "beast": {"name": "Дух зверя", "img": "spirit_wolf_left.png", "hp": 100, "dmg": [4,7], "gold": 5, "silver": 20, "rubin": 1, "location": "promysel"},
 }
+SHOP = load_json("shop") or {}
 
 def get_db():
     if DATABASE_URL:
@@ -51,53 +57,31 @@ def init_db():
         conn = get_db(); cur = conn.cursor()
         if DATABASE_URL:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
-            cur.execute("CREATE TABLE IF NOT EXISTS monster_cfg (key TEXT PRIMARY KEY, data TEXT)")
             cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INTEGER DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
-            cur.execute("CREATE TABLE IF NOT EXISTS monster_cfg (key TEXT PRIMARY KEY, data TEXT)")
             cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-        conn.commit()
-        for k,v in DEFAULT_MONSTERS.items():
-            if DATABASE_URL: cur.execute("SELECT * FROM monster_cfg WHERE key=%s",(k,))
-            else: cur.execute("SELECT * FROM monster_cfg WHERE key=?",(k,))
-            row = cur.fetchone()
-            if not row:
-                if DATABASE_URL: cur.execute("INSERT INTO monster_cfg (key,data) VALUES (%s,%s)",(k,json.dumps(v)))
-                else: cur.execute("INSERT INTO monster_cfg (key,data) VALUES (?,?)",(k,json.dumps(v)))
-            else:
-                try:
-                    d = json.loads(row["data"] if isinstance(row,dict) else row[1])
-                    if "location" not in d:
-                        d["location"] = "promysel"
-                        if DATABASE_URL: cur.execute("UPDATE monster_cfg SET data=%s WHERE key=%s",(json.dumps(d),k))
-                        else: cur.execute("UPDATE monster_cfg SET data=? WHERE key=?",(json.dumps(d),k))
-                except: pass
         conn.commit(); cur.close(); conn.close()
     except Exception as e: print(f"DB INIT ERROR: {e}")
 init_db()
 
 def get_monsters():
-    try:
-        conn=get_db(); cur=conn.cursor()
-        cur.execute("SELECT * FROM monster_cfg")
-        rows=cur.fetchall(); cur.close(); conn.close()
-        out={}
-        for r in rows:
-            k = r["key"] if isinstance(r,dict) else r[0]
-            d = r["data"] if isinstance(r,dict) else r[1]
-            out[k]=json.loads(d)
-        if not out: return DEFAULT_MONSTERS
-        for kk in out:
-            if "location" not in out[kk]: out[kk]["location"] = "promysel"
-        return out
-    except: return DEFAULT_MONSTERS
+    data = load_json("monsters")
+    if not data: return DEFAULT_MONSTERS
+    for kk in data:
+        if "location" not in data[kk]: data[kk]["location"] = "promysel"
+    return data
 
 def save_monster(key, data):
-    conn=get_db(); cur=conn.cursor()
-    if DATABASE_URL: cur.execute("UPDATE monster_cfg SET data=%s WHERE key=%s",(json.dumps(data),key))
-    else: cur.execute("UPDATE monster_cfg SET data=? WHERE key=?",(json.dumps(data),key))
-    conn.commit(); cur.close(); conn.close()
+    monsters = get_monsters()
+    monsters[key] = data
+    save_json("monsters", monsters)
+
+def delete_monster(key):
+    monsters = get_monsters()
+    if key in monsters:
+        del monsters[key]
+        save_json("monsters", monsters)
 
 def convert_silver(uid):
     try:
@@ -533,6 +517,7 @@ def api_chat():
         return jsonify({"ok":True})
     except Exception as e: return jsonify({"ok":False,"msg":str(e)})
 
+# ===== МАГАЗИН ИЗ data/shop.json =====
 @app.route("/shop")
 def shop():
     if "uid" not in session: return redirect("/")
@@ -572,7 +557,41 @@ def shop_cat(cat):
     if "uid" not in session: return redirect("/")
     names={"weapon":"🗡️ Оружие","armor":"🛡️ Броня","potion":"🧪 Зелья и Свитки","amulet":"🔮 Амулеты","misc":"📦 Разное","auction":"🏆 Аукцион","sell":"💰 Продать","chars":"🧝 Персонажи"}
     title=names.get(cat,"Магазин")
-    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>{title}</h2><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">Тут скоро будут товары!</div><a href="/shop" class="btn-orange">← К магазину</a></div>', True)
+    # Товары берём из data/shop.json - свежие каждый раз
+    shop_data = load_json("shop")
+    items = shop_data.get(cat, [])
+    if not items:
+        cards = '<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">Тут пока пусто! Добавь товар в data/shop.json → раздел "' + cat + '"</div>'
+    else:
+        cards = ""
+        for it in items:
+            price = ""
+            if it.get("gold"): price += f'{it["gold"]}🪙 '
+            if it.get("silver"): price += f'{it["silver"]}⚪ '
+            if it.get("rubin"): price += f'{it["rubin"]}💎 '
+            cards += f'<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0;text-align:left"><b>{it.get("name","Товар")}</b><br><small>{it.get("desc","")}</small><br><b>Цена: {price or "Бесплатно"}</b><br><form method="post" action="/shop/buy/{cat}/{it.get("id","")}"><button class="btn-orange" style="margin:8px auto 0">Купить</button></form></div>'
+    msg = request.args.get("msg","")
+    msg_html = f'<p style="color:green;font-weight:bold">{msg}</p>' if msg else ""
+    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>{title}</h2>{msg_html}{cards}<a href="/shop" class="btn-orange">← К магазину</a></div>', True)
+
+@app.route("/shop/buy/<cat>/<item_id>", methods=["POST"])
+def shop_buy(cat, item_id):
+    if "uid" not in session: return redirect("/")
+    shop_data = load_json("shop")
+    items = shop_data.get(cat, [])
+    item = next((x for x in items if str(x.get("id")) == str(item_id)), None)
+    if not item: return redirect(f"/shop/{cat}?msg=Товар не найден")
+    p = get_player(session["uid"]); l, h, r, g, s = vals(p)
+    need_g = int(item.get("gold") or 0); need_s = int(item.get("silver") or 0); need_r = int(item.get("rubin") or 0)
+    if g < need_g or s < need_s or r < need_r:
+        return redirect(f"/shop/{cat}?msg=Не хватает денег!")
+    try:
+        conn=get_db(); cur=conn.cursor()
+        if DATABASE_URL: cur.execute("UPDATE players SET gold=gold-%s, silver=silver-%s, rubin=rubin-%s WHERE id=%s",(need_g, need_s, need_r, session["uid"]))
+        else: cur.execute("UPDATE players SET gold=gold-?, silver=silver-?, rubin=rubin-? WHERE id=?",(need_g, need_s, need_r, session["uid"]))
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e: return redirect(f"/shop/{cat}?msg=Ошибка: {e}")
+    return redirect(f"/shop/{cat}?msg=✅ Куплено: {item.get('name','')}")
 
 @app.route("/hero")
 def hero():
@@ -793,7 +812,7 @@ def admin():
                     m["silver"] = int(request.form.get("m_silver") or 0)
                     m["rubin"] = int(request.form.get("m_rubin") or 0)
                     m["dmg"] = [int(request.form.get("m_dmg_min") or 2), int(request.form.get("m_dmg_max") or 4)]
-                    save_monster(key, m); msg = f"✅ Монстр {m['name']} обновлён!"
+                    save_monster(key, m); msg = f"✅ Монстр {m['name']} обновлён! (сохранено в data/monsters.json)"
             elif action == "add_monster":
                 key = request.form.get("m_key","").strip().lower().replace(" ","_")
                 monsters = get_monsters()
@@ -808,12 +827,12 @@ def admin():
                         "rubin": int(request.form.get("m_rubin") or 0),
                         "location": request.form.get("m_location","promysel")
                     }
-                    conn2 = get_db(); cur2 = conn2.cursor()
-                    if DATABASE_URL: cur2.execute("INSERT INTO monster_cfg (key,data) VALUES (%s,%s)",(key, json.dumps(new_m)))
-                    else: cur2.execute("INSERT INTO monster_cfg (key,data) VALUES (?,?)",(key, json.dumps(new_m)))
-                    conn2.commit(); cur2.close(); conn2.close()
+                    save_monster(key, new_m)
                     msg = f"✅ Монстр {new_m['name']} добавлен в {LOCATIONS.get(new_m['location'],{}).get('name', new_m['location'])}"
                 else: msg = "❌ Такой ключ уже есть или пустой"
+            elif action == "delete_monster":
+                key = request.form.get("mkey")
+                delete_monster(key); msg = f"✅ Монстр {key} удалён из файла"
             elif action == "move_monster":
                 key = request.form.get("mkey")
                 monsters = get_monsters()
@@ -874,6 +893,11 @@ def admin():
           <input type="hidden" name="mkey" value="{key}">
           Переместить в: <select name="new_location">{loc_sel}</select>
           <button class="btn-orange" style="margin:5px auto">📍 Переместить</button>
+        </form>
+        <form method="post" onsubmit="return confirm('Удалить монстра?')" style="margin:-5px 0 10px">
+          <input type="hidden" name="action" value="delete_monster">
+          <input type="hidden" name="mkey" value="{key}">
+          <button style="width:100%;padding:8px;background:#c92a2a;color:#fff;border:0;border-radius:8px;font-weight:bold">🗑️ Удалить монстра</button>
         </form>'''
     html = f'''
     <div class="wrap" style="padding:15px">
