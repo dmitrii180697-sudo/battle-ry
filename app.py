@@ -341,7 +341,7 @@ def go_loc(code):
     loc_name = LOCATIONS[code]["name"]
     # ВАЖНО: на странице локации монстров НЕ показываем!
     # Монстры только в Промыселе
-    body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3><p style="text-align:center">Ты в локации {loc_name}. Монстры ждут тебя в Промыселе!</p><a href="/promysel" class="btn-orange">🌲 Промысел — тут монстры</a><a href="/game" class="btn-orange">← На главную</a><a href="/map" class="btn-orange">📍 Карта</a></div>'
+    body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3><a href="/game" class="btn-orange">← На главную</a><a href="/map" class="btn-orange">📍 Карта</a></div>'
     return render_page(body, True)
 
 @app.route("/fight/<monster>")
