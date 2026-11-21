@@ -52,7 +52,7 @@ function useScroll(n){
 }
 
 async function makeAction(type){
-  if(type !== 'enemy_auto' && !canAttack) return;
+  if(type == 'enemy_auto') type = 'enemy_turn';
   if(type === 'hit' || type === 'super' || type === 'shield'){
     let now = Date.now();
     if(now - lastAttackTime < ATTACK_COOLDOWN) return;
@@ -99,6 +99,9 @@ async function makeAction(type){
     let data = await resp.json();
     if(data.status === 'redirect'){ window.location.href = data.url; return; }
 
+    if((type == 'hit' || type == 'super' || type == 'shield') && !data.finished){
+  setTimeout(() => makeAction('enemy_turn'), 800);
+}
     if(document.getElementById('enHp')) document.getElementById('enHp').innerText = data.enemy_hp;
     if(document.getElementById('enBar')) document.getElementById('enBar').style.width = Math.max(0, (data.enemy_hp*100/data.enemy_max)) + '%';
     if(document.getElementById('myHp')) document.getElementById('myHp').innerText = data.my_hp;
