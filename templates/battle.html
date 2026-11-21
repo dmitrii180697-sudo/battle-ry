@@ -17,8 +17,7 @@
   .arena{flex:1;min-height:340px;margin:12px 0 8px;background:url('/static/camp.jpg') center/cover no-repeat;background-color:#2b1a0e;border-radius:16px;border:3px solid #c89b5e;display:flex;align-items:flex-end;justify-content:space-between;padding:0 10px 0;overflow:hidden;position:relative}
   .fighter{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
   .fighter img{width:100%;max-width:190px;height:300px;object-fit:contain;object-position:bottom;filter:drop-shadow(0 6px 10px rgba(0,0,0,.8));display:block}
-  .vs-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.7);border:2px solid #ffcc00;color:#ffcc00;font-weight:900;font-size:22px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5}
-  .hit-btn{flex:1;padding:16px 4px;font-size:16px;font-weight:900;border:none;border-radius:10px;cursor:pointer;color:#fff}
+  .hit-btn{flex:1;padding:14px 4px;font-size:15px;font-weight:900;border:none;border-radius:10px;cursor:pointer;color:#fff}
   .hit-btn:disabled{opacity:.5;cursor:not-allowed}
   .hit-btn.cooldown{opacity:.6;filter:grayscale(.3)}
   .btn-row{display:flex;gap:8px}
@@ -26,7 +25,10 @@
   @keyframes shakeRight { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} }
   @keyframes shakeScreen { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
   .potions-bar{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;background:#2b1a0e;padding:6px;border:2px solid #5a3e22;border-radius:8px;margin-top:10px}
-  .potion-slot{background:linear-gradient(#4a3525,#2b1a0e);border:1px solid #8a6a3d;border-radius:4px;height:36px;display:flex;align-items:center;justify-content:center;color:#ffb84d;font-weight:bold;font-size:12px}
+  .potion-slot{background:linear-gradient(#4a3525,#2b1a0e);border:1px solid #8a6a3d;border-radius:4px;height:36px;display:flex;align-items:center;justify-content:center;color:#ffb84d;font-weight:bold;font-size:12px;cursor:pointer}
+  .scroll-slot{background:linear-gradient(#2b2a4a,#1a1a2b);border:1px solid #7a7ab8;border-radius:4px;height:36px;display:flex;align-items:center;justify-content:center;color:#b8b8ff;font-weight:bold;font-size:12px;cursor:pointer}
+  .bar-label{font-size:11px;color:#ffb84d;text-align:left;margin:8px 0 0 2px;font-weight:bold}
+  .bar-label.scroll{color:#b8b8ff}
 </style>
 </head>
 <body>
@@ -42,17 +44,35 @@
 
   <div class="arena" id="arena">
     <div class="fighter" id="heroBox"><img id="heroImg" src="/static/{{ player_img|default('barbarian_game_size.png') }}" onerror="this.style.opacity=0"></div>
-    <div class="vs-badge">VS</div>
     <div class="fighter" id="enemyBox"><img id="enemyImg" src="/static/{{ enemy_img|default('ancient_warrior.png') }}" onerror="this.style.opacity=0"></div>
   </div>
 
-  <!-- Кнопки: только УДАР и БЕГ, СУПЕР убран -->
+  <div id="superInfo" style="font-size:13px;color:#ffcc00;margin:2px">Супер {{ super_used|default(0) }}/4 • Нужно ударов для следующего: {{ need_for_next|default(5) }}</div>
+
   <div class="btn-row" style="margin-top:8px">
     <button class="hit-btn" id="hitBtn" style="background:#2e7d32" onclick="makeAction('hit')">👊 УДАР (<span id="hitCnt">{{ hit_cnt|default(0) }}</span>)</button>
-    <button class="hit-btn" style="background:#555" onclick="makeAction('run')">🏃 БЕГ</button>
+    <button class="hit-btn" id="superBtn" style="background:#FFC107;color:#000" onclick="makeAction('super')">⚡ СУПЕР <span id="superCnt">{{ super_used|default(0) }}/4</span><br><small id="superNeed" style="font-size:11px">{% if (super_used|default(0)) >= 4 %}всё!{% else %}нужно {{ need_for_next|default(5) }}{% endif %}</small></button>
+    <button class="hit-btn" id="shieldBtn" style="background:#2f5a7a" onclick="makeAction('shield')">🛡️ ЩИТ<br><small id="shieldState" style="font-size:11px">готов</small></button>
   </div>
 
-  <div class="potions-bar"><div class="potion-slot">🍷 1</div><div class="potion-slot">🧪 2</div><div class="potion-slot">📜 3</div><div class="potion-slot">🛡️ 4</div><div class="potion-slot">⚡ 5</div></div>
+  <div class="bar-label">🧪 Зелья</div>
+  <div class="potions-bar">
+    <div class="potion-slot" onclick="usePotion(1)">🍷 1</div>
+    <div class="potion-slot" onclick="usePotion(2)">🧪 2</div>
+    <div class="potion-slot" onclick="usePotion(3)">🍷 3</div>
+    <div class="potion-slot" onclick="usePotion(4)">🧪 4</div>
+    <div class="potion-slot" onclick="usePotion(5)">🍷 5</div>
+  </div>
+
+  <div class="bar-label scroll">📜 Свитки</div>
+  <div class="potions-bar">
+    <div class="scroll-slot" onclick="useScroll(1)">📜 1</div>
+    <div class="scroll-slot" onclick="useScroll(2)">📜 2</div>
+    <div class="scroll-slot" onclick="useScroll(3)">📜 3</div>
+    <div class="scroll-slot" onclick="useScroll(4)">📜 4</div>
+    <div class="scroll-slot" onclick="useScroll(5)">📜 5</div>
+  </div>
+
   <a href="/promysel" style="display:block;color:#fff;margin-top:10px">← На промысел</a>
 </div>
 

@@ -2,10 +2,10 @@ let canAttack = true;
 let timeLeft = 20;
 let timerInt = null;
 
-// === ИНТЕРВАЛ МЕЖДУ УДАРАМИ ===
-// 1100 = 1.1 секунды между ударами. Поставь 1500 если хочешь еще медленнее
+// Интервал между ударами - 1.1 сек. Хочешь медленнее - поставь 1500
 const ATTACK_COOLDOWN = 1100;
 let lastAttackTime = 0;
+let shieldActive = false;
 
 function startTimer(){
   clearInterval(timerInt);
@@ -42,31 +42,52 @@ function shakeScreen(){
   w.style.animation = 'shakeScreen .35s ease';
 }
 
+function usePotion(n){
+  let slots = document.querySelectorAll('.potion-slot');
+  if(slots[n-1]){ slots[n-1].style.background = '#2e7d32'; setTimeout(()=>{ slots[n-1].style.background=''; }, 300); }
+}
+function useScroll(n){
+  let slots = document.querySelectorAll('.scroll-slot');
+  if(slots[n-1]){ slots[n-1].style.background = '#3a3a7a'; setTimeout(()=>{ slots[n-1].style.background=''; }, 300); }
+}
+
 async function makeAction(type){
   if(type !== 'enemy_auto' && !canAttack) return;
-  // === ЗАЩИТА ОТ СПАМА: не даем бить чаще чем раз в ATTACK_COOLDOWN ===
-  if(type === 'hit'){
+  if(type === 'hit' || type === 'super' || type === 'shield'){
     let now = Date.now();
     if(now - lastAttackTime < ATTACK_COOLDOWN) return;
     lastAttackTime = now;
   }
+  if(type === 'shield' && shieldActive) return;
   if(type !== 'run') canAttack = false;
   clearInterval(timerInt);
 
   const hero = document.getElementById('heroImg');
   const enemy = document.getElementById('enemyImg');
   const hitBtn = document.getElementById('hitBtn');
+  const superBtn = document.getElementById('superBtn');
+  const shieldBtn = document.getElementById('shieldBtn');
   if(hitBtn) { hitBtn.disabled = true; hitBtn.classList.add('cooldown'); }
+  if(superBtn) { superBtn.disabled = true; superBtn.classList.add('cooldown'); }
+  if(shieldBtn) { shieldBtn.disabled = true; shieldBtn.classList.add('cooldown'); }
 
-  if(hero && type === 'hit'){
+  if(hero && (type === 'hit' || type === 'super')){
     hero.style.animation = 'none'; void hero.offsetWidth;
     hero.style.animation = 'attackLeft 0.45s ease';
   }
-  if(enemy && type === 'hit'){
+  if(enemy && (type === 'hit' || type === 'super')){
     setTimeout(()=>{
       enemy.style.animation = 'none'; void enemy.offsetWidth;
       enemy.style.animation = 'shakeRight 0.45s ease';
     }, 220);
+  }
+  if(type === 'super') shakeScreen();
+
+  if(type === 'shield'){
+    shieldActive = true;
+    let st = document.getElementById('shieldState');
+    if(st) st.innerText = 'активен!';
+    if(hero) hero.style.filter = 'drop-shadow(0 0 12px #7ab8ff) brightness(1.2)';
   }
 
   try{
@@ -83,6 +104,20 @@ async function makeAction(type){
     if(document.getElementById('myHp')) document.getElementById('myHp').innerText = data.my_hp;
     if(document.getElementById('myBar')) document.getElementById('myBar').style.width = Math.max(0, (data.my_hp*100/data.my_max)) + '%';
     if(document.getElementById('hitCnt')) document.getElementById('hitCnt').innerText = data.hit_cnt;
+
+    if(data.super_used !== undefined){
+      if(document.getElementById('superCnt')) document.getElementById('superCnt').innerText = data.super_used + '/4';
+      if(document.getElementById('superInfo')) document.getElementById('superInfo').innerText = 'Супер ' + data.super_used + '/4 • Нужно ударов для следующего: ' + (data.need_for_next ?? '');
+      if(document.getElementById('superNeed')) document.getElementById('superNeed').innerText = data.super_used >= 4 ? 'всё!' : 'нужно ' + (data.need_for_next ?? '');
+    }
+
+    // Щит сработал - враг ударил на 0
+    if(shieldActive && data.edmg === 0){
+      shieldActive = false;
+      let st = document.getElementById('shieldState');
+      if(st) st.innerText = 'готов';
+      if(hero) hero.style.filter = 'drop-shadow(0 6px 10px rgba(0,0,0,.8))';
+    }
 
     let isCrit = data.last_dmg >= 7;
     if(data.last_dmg > 0) showDamage('-' + data.last_dmg, 'enemy', isCrit);
@@ -106,10 +141,11 @@ async function makeAction(type){
     resetTimer();
   } catch(e){ console.error(e); }
   finally {
-    // === ПАУЗА ПЕРЕД СЛЕДУЮЩИМ УДАРОМ ===
     setTimeout(()=>{
       canAttack = true;
       if(hitBtn){ hitBtn.disabled = false; hitBtn.classList.remove('cooldown'); }
+      if(superBtn){ superBtn.disabled = false; superBtn.classList.remove('cooldown'); }
+      if(shieldBtn){ shieldBtn.disabled = false; shieldBtn.classList.remove('cooldown'); }
     }, ATTACK_COOLDOWN);
   }
 }

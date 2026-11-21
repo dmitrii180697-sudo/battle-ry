@@ -373,6 +373,7 @@ def fight(monster):
     session["enemy_dmg"] = cfg.get("dmg", [2,4]); session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
     session["my_hp"] = h; session["hit_count"] = 0; session["rewarded"] = False
     session["super_used"] = 0; session["super_hits"] = 0
+    session["shield_active"] = False
     session["reward_g"] = cfg.get("gold", 2); session["reward_s"] = cfg.get("silver", 10); session["reward_r"] = cfg.get("rubin", 0)
     session.modified = True
     return redirect("/fight_battle")
@@ -389,16 +390,38 @@ def fight_battle():
         cur_my = session.get("my_hp", my_max_hp); cur_en = session.get("enemy_hp", 20); hit_cnt = session.get("hit_count", 0)
         super_used = session.get("super_used", 0); super_hits = session.get("super_hits", 0)
         dmg = 0; edmg = 0
-        if m == "enemy_auto":
-            edmg = random.randint(2, 6); cur_my = max(0, cur_my - edmg)
+                # === ЩИТ ===
+        # Если щит активен - враг бьет на 0 и щит снимается
+        def enemy_hit():
+            nonlocal cur_my
+            if session.get("shield_active"):
+                session["shield_active"] = False
+                return 0
+            emin, emax = session.get("enemy_dmg", [2,5])
+            d = random.randint(emin, emax)
+            cur_my = max(0, cur_my - d)
+            return d
+
+        if m == "shield" and cur_my > 0 and cur_en > 0:
+            # Ставим щит - враг сразу бьет, но урон 0
+            session["shield_active"] = True
+            edmg = enemy_hit()  # вернет 0 и снимет щит
+            # Щит уже отработал, для JS нам нужен edmg=0 чтобы снять свечение
+        elif m == "enemy_auto":
+            # Таймер кончился - враг бьет
+            if session.get("shield_active"):
+                edmg = 0
+                session["shield_active"] = False
+            else:
+                edmg = random.randint(2, 6); cur_my = max(0, cur_my - edmg)
         elif m == "hit" and cur_my > 0 and cur_en > 0:
             dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1
             if cur_en > 0:
-                emin, emax = session.get("enemy_dmg", [2,5]); edmg = random.randint(emin, emax); cur_my = max(0, cur_my - edmg)
+                edmg = enemy_hit()
         elif m == "super" and cur_my > 0 and cur_en > 0 and super_used < 4 and super_hits >= 5:
             dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0
             if cur_en > 0:
-                emin, emax = session.get("enemy_dmg", [2,5]); edmg = random.randint(emin, emax); cur_my = max(0, cur_my - edmg)
+                edmg = enemy_hit()
         session["enemy_hp"] = cur_en; session["my_hp"] = cur_my; session["hit_count"] = hit_cnt
         session["super_used"] = super_used; session["super_hits"] = super_hits; session.modified = True
         need_for_next = 0 if super_used >= 4 else (5 - super_hits)
