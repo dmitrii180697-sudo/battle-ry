@@ -21,18 +21,18 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# ===== ЛОКАЦИИ - чтобы добавить новую, добавь 1 строчку сюда =====
-LOCATIONS = {
-    "lager": {"name": "🏕️ Лагерь", "desc": "Безопасное место"},
-    "promysel": {"name": "🌲 Промысел", "desc": "Охота на монстров"},
-    "les": {"name": "🌲🌲 Лес", "desc": "Тёмный лес"},
-    "peshera": {"name": "🕳️ Пещера", "desc": "Тёмная пещера"},
-    "zastava": {"name": "🛡️ Застава", "desc": "Граница"},
-    "oboz": {"name": "🛒 Обоз", "desc": "Торговый обоз"},
-}
+# ===== ДАННЫЕ ИЗ ПАПКИ data/ =====
+def load_json(name):
+    path = os.path.join(os.path.dirname(__file__), "data", f"{name}.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
 
-# ===== МОНСТРЫ - у каждого есть location =====
-DEFAULT_MONSTERS = {
+LOCATIONS = load_json("locations")
+# Монстры по умолчанию - из файла, если файла нет - берём 2 базовых
+DEFAULT_MONSTERS = load_json("monsters") or {
     "warrior": {"name": "Древний воин", "img": "ancient_warrior.png", "hp": 20, "dmg": [2,4], "gold": 2, "silver": 10, "rubin": 0, "location": "promysel"},
     "beast": {"name": "Дух зверя", "img": "spirit_wolf_left.png", "hp": 100, "dmg": [4,7], "gold": 5, "silver": 20, "rubin": 1, "location": "promysel"},
 }
@@ -66,7 +66,6 @@ def init_db():
                 if DATABASE_URL: cur.execute("INSERT INTO monster_cfg (key,data) VALUES (%s,%s)",(k,json.dumps(v)))
                 else: cur.execute("INSERT INTO monster_cfg (key,data) VALUES (?,?)",(k,json.dumps(v)))
             else:
-                # Миграция старых монстров без location -> ставим promysel
                 try:
                     d = json.loads(row["data"] if isinstance(row,dict) else row[1])
                     if "location" not in d:
@@ -89,7 +88,6 @@ def get_monsters():
             d = r["data"] if isinstance(r,dict) else r[1]
             out[k]=json.loads(d)
         if not out: return DEFAULT_MONSTERS
-        # На всякий случай - если у монстра нет location, считаем что он в promysel
         for kk in out:
             if "location" not in out[kk]: out[kk]["location"] = "promysel"
         return out
@@ -262,6 +260,7 @@ def map_page():
     if "uid" not in session: return redirect("/")
     links = ""
     for code, info in LOCATIONS.items():
+        if code == "promysel": continue
         links += f'<a href="/loc/{code}" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:10px">{info["name"]}</a>'
     html = f"""
     <div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh;background:#1a0e0a;color:#fff">
@@ -331,7 +330,6 @@ def game():
 def logout():
     session.clear(); return redirect("/")
 
-# ===== ЛОКАЦИИ: папка templates/locations/ в будущем, пока один роут на все =====
 def _monster_cards(monsters, loc_code):
     cards = ""
     for key, cfg in monsters.items():
@@ -390,8 +388,6 @@ def fight_battle():
         cur_my = session.get("my_hp", my_max_hp); cur_en = session.get("enemy_hp", 20); hit_cnt = session.get("hit_count", 0)
         super_used = session.get("super_used", 0); super_hits = session.get("super_hits", 0)
         dmg = 0; edmg = 0
-                # === ЩИТ ===
-        # Если щит активен - враг бьет на 0 и щит снимается
         def enemy_hit():
             nonlocal cur_my
             if session.get("shield_active"):
@@ -401,14 +397,10 @@ def fight_battle():
             d = random.randint(emin, emax)
             cur_my = max(0, cur_my - d)
             return d
-
         if m == "shield" and cur_my > 0 and cur_en > 0:
-            # Ставим щит - враг сразу бьет, но урон 0
             session["shield_active"] = True
-            edmg = enemy_hit()  # вернет 0 и снимет щит
-            # Щит уже отработал, для JS нам нужен edmg=0 чтобы снять свечение
+            edmg = enemy_hit()
         elif m == "enemy_auto":
-            # Таймер кончился - враг бьет
             if session.get("shield_active"):
                 edmg = 0
                 session["shield_active"] = False
@@ -442,7 +434,6 @@ def fight_battle():
         enemy_hp=cur_enemy_hp, enemy_max=enemy_max_hp, enemy_per=enemy_per,
         hit_cnt=hit_cnt, super_used=super_used, need_for_next=need_for_next)
 
-# ===== 💬 ЧАТ =====
 BAD_WORDS = ["бля", "хуй", "пизд", "сука", "ебан", "нахуй", "fuck", "shit"]
 CHAT_SPAM = {}
 def chat_check(uid, text):
@@ -542,7 +533,6 @@ def api_chat():
         return jsonify({"ok":True})
     except Exception as e: return jsonify({"ok":False,"msg":str(e)})
 
-# ===== МАГАЗИН: папка templates/shop/ в будущем, пока роуты тут =====
 @app.route("/shop")
 def shop():
     if "uid" not in session: return redirect("/")

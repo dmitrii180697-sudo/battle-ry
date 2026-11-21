@@ -1,0 +1,5 @@
+{
+  "shield_wood": {"name": "Деревянный щит", "price": 100, "block": 5},
+  "sword_1": {"name": "Меч новичка", "price": 150, "dmg": 10},
+  "potion": {"name": "Зелье здоровья", "price": 50, "heal": 50}
+}
