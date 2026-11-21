@@ -2,6 +2,11 @@ let canAttack = true;
 let timeLeft = 20;
 let timerInt = null;
 
+// === ИНТЕРВАЛ МЕЖДУ УДАРАМИ ===
+// 1100 = 1.1 секунды между ударами. Поставь 1500 если хочешь еще медленнее
+const ATTACK_COOLDOWN = 1100;
+let lastAttackTime = 0;
+
 function startTimer(){
   clearInterval(timerInt);
   timeLeft = 20;
@@ -39,22 +44,30 @@ function shakeScreen(){
 
 async function makeAction(type){
   if(type !== 'enemy_auto' && !canAttack) return;
+  // === ЗАЩИТА ОТ СПАМА: не даем бить чаще чем раз в ATTACK_COOLDOWN ===
+  if(type === 'hit'){
+    let now = Date.now();
+    if(now - lastAttackTime < ATTACK_COOLDOWN) return;
+    lastAttackTime = now;
+  }
   if(type !== 'run') canAttack = false;
   clearInterval(timerInt);
 
   const hero = document.getElementById('heroImg');
   const enemy = document.getElementById('enemyImg');
-  if(hero && (type === 'hit' || type === 'super')){
+  const hitBtn = document.getElementById('hitBtn');
+  if(hitBtn) { hitBtn.disabled = true; hitBtn.classList.add('cooldown'); }
+
+  if(hero && type === 'hit'){
     hero.style.animation = 'none'; void hero.offsetWidth;
-    hero.style.animation = 'attackLeft 0.32s ease';
+    hero.style.animation = 'attackLeft 0.45s ease';
   }
-  if(enemy && (type === 'hit' || type === 'super')){
+  if(enemy && type === 'hit'){
     setTimeout(()=>{
       enemy.style.animation = 'none'; void enemy.offsetWidth;
-      enemy.style.animation = 'shakeRight 0.32s ease';
-    }, 180);
+      enemy.style.animation = 'shakeRight 0.45s ease';
+    }, 220);
   }
-  if(type === 'super') shakeScreen();
 
   try{
     let resp = await fetch('/fight_battle', {
@@ -71,21 +84,9 @@ async function makeAction(type){
     if(document.getElementById('myBar')) document.getElementById('myBar').style.width = Math.max(0, (data.my_hp*100/data.my_max)) + '%';
     if(document.getElementById('hitCnt')) document.getElementById('hitCnt').innerText = data.hit_cnt;
 
-    if(data.super_used !== undefined){
-      if(document.getElementById('superCnt')) document.getElementById('superCnt').innerText = data.super_used + '/4';
-      if(document.getElementById('superInfo')) document.getElementById('superInfo').innerText = 'Супер ' + data.super_used + '/4 • Нужно ударов для следующего: ' + (data.need_for_next ?? '');
-      if(document.getElementById('superNeed')) document.getElementById('superNeed').innerText = data.super_used >= 4 ? 'всё!' : 'нужно ' + (data.need_for_next ?? '');
-    }
-
     let isCrit = data.last_dmg >= 7;
     if(data.last_dmg > 0) showDamage('-' + data.last_dmg, 'enemy', isCrit);
     if(data.edmg > 0) showDamage('-' + data.edmg, 'hero', false);
-
-    let logEl = document.getElementById('log');
-    if(type === 'hit' && logEl) logEl.innerHTML = isCrit ? `💥 <b>КРИТ!</b> -${data.last_dmg} HP! Враг ответил -${data.edmg}` : `Вы нанесли <span style="color:#ff4d4d">-${data.last_dmg}</span> HP! Враг ответил -${data.edmg}`;
-    if(type === 'super' && logEl) logEl.innerHTML = `🔥 СУПЕРУДАР! -${data.last_dmg} HP!`;
-    if(type === 'enemy_auto') addLog(`Ты замешкался! Враг ударил на -${data.edmg}`);
-    else if(data.last_dmg > 0 || data.edmg > 0) addLog(`Ты ударил на -${data.last_dmg} | Враг ответил на -${data.edmg}`);
 
     if(data.finished){
       clearInterval(timerInt);
@@ -104,7 +105,13 @@ async function makeAction(type){
 
     resetTimer();
   } catch(e){ console.error(e); }
-  finally { canAttack = true; }
+  finally {
+    // === ПАУЗА ПЕРЕД СЛЕДУЮЩИМ УДАРОМ ===
+    setTimeout(()=>{
+      canAttack = true;
+      if(hitBtn){ hitBtn.disabled = false; hitBtn.classList.remove('cooldown'); }
+    }, ATTACK_COOLDOWN);
+  }
 }
 
 function showDamage(text, who, isCrit){
@@ -121,15 +128,6 @@ function showDamage(text, who, isCrit){
     el.style.top = y + 'px'; el.style.opacity = op;
     if(op <= 0){ clearInterval(timer); el.remove(); }
   }, 20);
-}
-
-function addLog(text){
-  const b = document.getElementById('battleLog');
-  if(!b) return;
-  const d = document.createElement('div');
-  d.innerText = text;
-  d.style.cssText = 'padding:4px 8px;border-bottom:1px solid #444;font-size:13px;color:#fff;';
-  b.prepend(d);
 }
 
 document.addEventListener("DOMContentLoaded", ()=>{ startTimer(); });

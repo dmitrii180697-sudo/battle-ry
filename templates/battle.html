@@ -18,8 +18,9 @@
   .fighter{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative}
   .fighter img{width:100%;max-width:190px;height:300px;object-fit:contain;object-position:bottom;filter:drop-shadow(0 6px 10px rgba(0,0,0,.8));display:block}
   .vs-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.7);border:2px solid #ffcc00;color:#ffcc00;font-weight:900;font-size:22px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:5}
-  .hit-btn{flex:1;padding:14px 4px;font-size:15px;font-weight:900;border:none;border-radius:10px;cursor:pointer;color:#fff}
+  .hit-btn{flex:1;padding:16px 4px;font-size:16px;font-weight:900;border:none;border-radius:10px;cursor:pointer;color:#fff}
   .hit-btn:disabled{opacity:.5;cursor:not-allowed}
+  .hit-btn.cooldown{opacity:.6;filter:grayscale(.3)}
   .btn-row{display:flex;gap:8px}
   @keyframes attackLeft { 0%{transform:translateX(0)} 50%{transform:translateX(24px) scale(1.03)} 100%{transform:translateX(0)} }
   @keyframes shakeRight { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(7px)} 60%{transform:translateX(-4px)} }
@@ -31,29 +32,32 @@
 <body>
 <div id="fightWrap">
   <div class="battle-names"><span>ТЫ ({{ lvl|default(1) }} ур.)</span><span id="battle-timer">20</span><span>{{ enemy_type|default('Враг') }}</span></div>
+
   <div style="text-align:center;margin:8px 0 0"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00;transition:width .2s"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
-  <div id="log" style="text-align:center;color:#ffeb00;font-weight:bold;min-height:22px;margin-top:6px">Приготовься к бою!</div>
+
   <div style="display:flex;gap:10px;margin-top:6px">
     <div style="flex:1;text-align:left"><div class="hp-row"><span>ВЫ</span><span><span id="myHp">{{ my_hp|default(20) }}</span> / {{ my_max_hp|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:{{ my_per|default(100) }}%"></div></div></div>
     <div style="flex:1;text-align:right"><div class="hp-row"><span>{{ enemy_type|default('Враг') }}</span><span><span id="enHp">{{ enemy_hp|default(20) }}</span> / {{ enemy_max|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill enemy" id="enBar" style="width:{{ enemy_per|default(100) }}%"></div></div></div>
   </div>
+
   <div class="arena" id="arena">
     <div class="fighter" id="heroBox"><img id="heroImg" src="/static/{{ player_img|default('barbarian_game_size.png') }}" onerror="this.style.opacity=0"></div>
     <div class="vs-badge">VS</div>
     <div class="fighter" id="enemyBox"><img id="enemyImg" src="/static/{{ enemy_img|default('ancient_warrior.png') }}" onerror="this.style.opacity=0"></div>
   </div>
-  <div id="superInfo" style="font-size:13px;color:#ffcc00;margin:2px">Супер {{ super_used|default(0) }}/4 • Нужно ударов для следующего: {{ need_for_next|default(5) }}</div>
-  <div id="battle-log" style="font-size:13px;opacity:.9">Бой начался! Бей первым!</div>
+
+  <!-- Кнопки: только УДАР и БЕГ, СУПЕР убран -->
   <div class="btn-row" style="margin-top:8px">
-    <button class="hit-btn" style="background:#2e7d32" onclick="makeAction('hit')">👊 УДАР (<span id="hitCnt">{{ hit_cnt|default(0) }}</span>)</button>
-    <button class="hit-btn" id="superBtn" style="background:#FFC107;color:#000" onclick="makeAction('super')">⚡ СУПЕР <span id="superCnt">{{ super_used|default(0) }}/4</span><br><small id="superNeed" style="font-size:11px">{% if (super_used|default(0)) >= 4 %}всё!{% else %}нужно {{ need_for_next|default(5) }}{% endif %}</small></button>
+    <button class="hit-btn" id="hitBtn" style="background:#2e7d32" onclick="makeAction('hit')">👊 УДАР (<span id="hitCnt">{{ hit_cnt|default(0) }}</span>)</button>
     <button class="hit-btn" style="background:#555" onclick="makeAction('run')">🏃 БЕГ</button>
   </div>
-  <div id="battleLog" style="background:#1a0e0a;max-height:100px;overflow-y:auto;border:2px solid #5a3e22;border-radius:8px;margin:10px 0;padding:4px;text-align:left"></div>
+
   <div class="potions-bar"><div class="potion-slot">🍷 1</div><div class="potion-slot">🧪 2</div><div class="potion-slot">📜 3</div><div class="potion-slot">🛡️ 4</div><div class="potion-slot">⚡ 5</div></div>
   <a href="/promysel" style="display:block;color:#fff;margin-top:10px">← На промысел</a>
 </div>
+
 <div id="endOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,0.88);display:none;align-items:center;justify-content:center;z-index:9999;padding:20px"><div style="background:linear-gradient(#3a2510,#1a0e0a);border:3px solid #ffcc00;border-radius:22px;padding:26px;width:100%;max-width:320px;text-align:center"><h2 id="endTitle" style="margin:0;color:gold;font-size:26px"></h2><div id="trophyBox" style="background:rgba(255,215,0,0.12);border:1.5px solid #c9a45c;border-radius:14px;padding:14px;margin:14px 0;font-size:16px;line-height:1.8;color:#ffe9a3"></div><a href="/promysel" style="display:block;background:linear-gradient(#ffcc00,#c9a45c);color:#000;padding:14px;border-radius:12px;font-weight:900;text-decoration:none">На промысел ➔</a></div></div>
+
 <script src="/static/game.js"></script>
 </body>
 </html>
