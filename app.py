@@ -180,8 +180,92 @@ def get_player(uid):
         conn = get_db(); cur = conn.cursor()
         if DATABASE_URL: cur.execute("SELECT * FROM players WHERE id=%s",(uid,))
         else: cur.execute("SELECT * FROM players WHERE id=?",(uid,))
-        p = cur.fetchone(); cur.close(); conn.close(); return p
+        row = cur.fetchone()
+        # получаем названия колонок
+        cols = [d[0] for d in cur.description] if cur.description else []
+        cur.close(); conn.close()
+        if not row: return None
+        # превращаем в dict, чтобы везде работал p.get("...")
+        if isinstance(row, dict):
+            return row
+        try:
+            # sqlite Row / psycopg Row умеют .keys()
+            return dict(row)
+        except:
+            return {cols[i]: row[i] for i in range(len(cols))}
     except: return None
+# === ИНВЕНТАРЬ ===
+import json as _json
+
+def ensure_inv_columns():
+    try:
+        conn = get_db(); cur = conn.cursor()
+        if DATABASE_URL:
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS inventory TEXT DEFAULT '[]'")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS equipped TEXT DEFAULT '{}'")
+        else:
+            cur.execute("PRAGMA table_info(players)")
+            cols = [c[1] for c in cur.fetchall()]
+            if "inventory" not in cols:
+                cur.execute("ALTER TABLE players ADD COLUMN inventory TEXT DEFAULT '[]'")
+            if "equipped" not in cols:
+                cur.execute("ALTER TABLE players ADD COLUMN equipped TEXT DEFAULT '{}'")
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print("inv cols err:", e)
+ensure_inv_columns()
+
+def get_inv(p):
+    if not p: return []
+    try: return _json.loads(p.get("inventory") or "[]")
+    except: return []
+
+def get_eq(p):
+    if not p: return {}
+    try: return _json.loads(p.get("equipped") or "{}")
+    except: return {}
+
+def save_inv(uid, inv, eq):
+    conn = get_db(); cur = conn.cursor()
+    if DATABASE_URL:
+        cur.execute("UPDATE players SET inventory=%s, equipped=%s WHERE id=%s", (_json.dumps(inv), _json.dumps(eq), uid))
+    else:
+        cur.execute("UPDATE players SET inventory=?, equipped=? WHERE id=?", (_json.dumps(inv), _json.dumps(eq), uid))
+    conn.commit(); cur.close(); conn.close()
+
+def find_item_by_id(item_id):
+    data = load_json("shop")
+    for cat, lst in data.items():
+        for it in lst:
+            if str(it.get("id")) == str(item_id):
+                it = dict(it); it["cat"] = cat
+                return it
+    return None
+
+def get_slot(it):
+    if it.get("slot"): return it["slot"]
+    cat = it.get("cat","")
+    name = it.get("name","").lower()
+    if cat == "weapon": return "weapon"
+    if "щит" in name: return "shield"
+    if "шлем" in name or "каска" in name: return "helmet"
+    if "перчат" in name: return "gloves"
+    if cat == "armor": return "armor"
+    if "ботин" in name or "сапог" in name or "обув" in name: return "boots"
+    if cat == "amulet": return "amulet"
+    if "кольцо" in name: return "ring"
+    if cat == "potion": return "elixir"
+    return "misc"
+
+def total_stats(p):
+    eq = get_eq(p)
+    bonus = {"damage":0, "armor":0, "dodge":0}
+    for slot, item_id in eq.items():
+        it = find_item_by_id(item_id)
+        if it:
+            for k in bonus:
+                bonus[k] += int(it.get(k) or 0)
+    return bonus
 
 def is_admin():
     if "uid" not in session: return False
@@ -768,16 +852,22 @@ def shop_buy(cat, item_id):
         return redirect(f"/shop/{cat}?msg=Не хватает денег!")
     try:
         conn=get_db(); cur=conn.cursor()
-        if DATABASE_URL: cur.execute("UPDATE players SET gold=gold-%s, silver=silver-%s, rubin=rubin-%s WHERE id=%s",(need_g, need_s, need_r, session["uid"]))
-        else: cur.execute("UPDATE players SET gold=gold-?, silver=silver-?, rubin=rubin-? WHERE id=?",(need_g, need_s, need_r, session["uid"]))
+        if DATABASE_URL: cur.execute("UPDATE players SET gold=gold-%s, silver=silver-%s, rubin=rubin-%s WHERE id=%s", (need_g, need_s, need_r, session["uid"]))
+        else: cur.execute("UPDATE players SET gold=gold-?, silver=silver-?, rubin=rubin-? WHERE id=?", (need_g, need_s, need_r, session["uid"]))
         conn.commit(); cur.close(); conn.close()
+        # --- выдаем вещь в рюкзак ---
+        p2 = get_player(session["uid"])
+        inv = get_inv(p2); eq = get_eq(p2)
+        inv.append({"id": item.get("id"), "cat": cat})
+        save_inv(session["uid"], inv, eq)
     except Exception as e: return redirect(f"/shop/{cat}?msg=Ошибка: {e}")
     return redirect(f"/shop/{cat}?msg=✅ Куплено: {item.get('name','')}")
-
 @app.route("/hero")
 def hero():
     if "uid" not in session: return redirect("/")
     p=get_player(session["uid"]); l,hr,r,g,s=vals(p)
+    eq = get_eq(p); inv = get_inv(p)
+    bonus = total_stats(p)
     nick = p.get("name","Воин") if isinstance(p,dict) or hasattr(p,'get') else "Воин"
     exp = int(p.get("exp",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     wins = int(p.get("wins",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
@@ -798,7 +888,85 @@ def hero():
     </div>
     <p style="text-align:center;color:#aaa;font-size:13px">Слава и Звания — скоро</p>
     <br><div style="text-align:center"><a href="/game"><button>⬅ Назад</button></a></div>
+    <a href="/hero/equipment" style="display:block;background:linear-gradient(180deg,#ffb84d,#ff7a00);color:#fff;text-decoration:none;font-weight:900;font-size:20px;padding:16px;border-radius:12px;border:2px solid #000;text-align:center;margin:12px 0">🧥 СНАРЯЖЕНИЕ</a>
     </div>''')
+SLOTS = [
+    ("weapon","🗡️","Оружие"),
+    ("shield","🛡️","Щиты"),
+    ("helmet","🪖","Шлемы"),
+    ("gloves","🧤","Перчатки"),
+    ("armor","🦺","Доспехи"),
+    ("boots","🥾","Обувь"),
+    ("amulet","🔮","Амулеты"),
+    ("ring","💍","Кольца"),
+    ("elixir","🧪","Эликсиры"),
+]
+
+@app.route("/hero/equipment")
+def hero_equipment():
+    if "uid" not in session: return redirect("/")
+    p = get_player(session["uid"])
+    inv = get_inv(p); eq = get_eq(p)
+    counts = {s:0 for s,_,_ in SLOTS}
+    for e in inv:
+        iid = e.get("id") if isinstance(e, dict) else e
+        it = find_item_by_id(iid)
+        if it:
+            sl = get_slot(it)
+            if sl in counts: counts[sl] += 1
+    rows = ""
+    for slot, icon, name in SLOTS:
+        worn = eq.get(slot)
+        worn_it = find_item_by_id(worn) if worn else None
+        worn_txt = f'<span style="color:#7aff8a">✅ {worn_it.get("name") if worn_it else ""}</span>' if worn_it else '<span style="color:#888">пусто</span>'
+        cnt = counts[slot]
+        rows += f'''
+        <a href="/hero/equipment/{slot}" style="text-decoration:none">
+        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,#2a4a6a,#162c46);border:2px solid #4a7ba6;border-radius:12px;padding:14px;margin-bottom:8px">
+          <div style="width:48px;height:48px;background:rgba(0,0,0,.35);border:2px solid #e8c268;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px">{icon}</div>
+          <div style="flex:1;text-align:left"><div style="color:#fff;font-weight:900;font-size:17px">[{cnt}] {name}</div><div style="font-size:12px">{worn_txt}</div></div>
+          <div style="color:#e8c268;font-size:22px">›</div>
+        </div></a>'''
+    return render_page(f'<div style="max-width:480px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#0a1e35,#122c4d);padding:12px"><div style="background:#0a1e35;border:2px solid #e8c268;border-radius:12px;padding:12px;text-align:center;color:#fff;font-weight:900;font-size:20px">🧥 СНАРЯЖЕНИЕ</div><div style="margin-top:12px">{rows}</div><a href="/hero" style="display:block;text-align:center;margin-top:10px;color:#f5e6b0;text-decoration:none">← К герою</a></div>', False)
+
+@app.route("/hero/equipment/<slot>")
+def hero_equipment_slot(slot):
+    if "uid" not in session: return redirect("/")
+    p = get_player(session["uid"])
+    inv = get_inv(p); eq = get_eq(p)
+    slot_name = dict((s,n) for s,_,n in SLOTS).get(slot, slot)
+    slot_icon = dict((s,i) for s,i,_ in SLOTS).get(slot, "📦")
+    cards = ""; found = False
+    for e in inv:
+        iid = e.get("id") if isinstance(e, dict) else e
+        it = find_item_by_id(iid)
+        if not it or get_slot(it) != slot: continue
+        found = True
+        is_worn = eq.get(slot) == str(iid)
+        cards += f'''<div style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid {"#2ecc71" if is_worn else "#5a3e22"};border-radius:12px;padding:10px;text-align:center;color:#3d2817"><div style="font-size:36px">{it.get("icon","📦")}</div><div style="font-size:13px;font-weight:bold">{it.get("name")}</div><div style="font-size:11px">⚔️{it.get("damage",0)} 🛡️{it.get("armor",0)} 💨{it.get("dodge",0)}</div><form method="post" action="{"/unequip/"+slot if is_worn else f"/equip/{slot}/{iid}"}" style="margin-top:6px"><button style="width:100%;background:{"#555" if is_worn else "#2ecc71"};color:#fff;padding:8px;border:0;border-radius:8px;font-weight:bold">{"Снять" if is_worn else "Надеть"}</button></form></div>'''
+    if not found:
+        cards = '<div style="background:#fdf6c8;padding:20px;border-radius:12px;text-align:center;color:#333">Тут пусто.<br>Купи вещь в магазине 🛒</div>'
+    else:
+        cards = f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">{cards}</div>'
+    return render_page(f'<div style="max-width:480px;margin:0 auto;padding:12px;min-height:100dvh;background:linear-gradient(180deg,#0a1e35,#122c4d)"><h2 style="color:#fff;text-align:center">{slot_icon} {slot_name}</h2>{cards}<a href="/hero/equipment" style="display:block;text-align:center;margin-top:14px;color:#f5e6b0;text-decoration:none">← Снаряжение</a></div>', False)
+
+@app.route("/equip/<cat>/<item_id>", methods=["POST"])
+def equip(cat, item_id):
+    if "uid" not in session: return redirect("/")
+    p = get_player(session["uid"])
+    inv = get_inv(p); eq = get_eq(p)
+    eq[cat] = str(item_id)
+    save_inv(session["uid"], inv, eq)
+    return redirect(f"/hero/equipment/{cat}")
+
+@app.route("/unequip/<cat>", methods=["POST"])
+def unequip(cat):
+    if "uid" not in session: return redirect("/")
+    p = get_player(session["uid"])
+    inv = get_inv(p); eq = get_eq(p)
+    eq.pop(cat, None)
+    save_inv(session["uid"], inv, eq)
+    return redirect(f"/hero/equipment/{cat}")
 
 @app.route("/player/<int:pid>")
 def player_view(pid):
