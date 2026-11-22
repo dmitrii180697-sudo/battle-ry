@@ -652,6 +652,7 @@ def shop():
     if "uid" not in session: return redirect("/")
     p = get_player(session["uid"]); l, h, r, g, s = vals(p)
     html = f'''
+    cur_loc_name = LOCATIONS.get(session.get("current_loc","lager"), {}).get("name","Лагерь")
     <style>
     .shop-wrap{{max-width:480px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#0a1e35 0%,#122c4d 40%,#1a0e0a 100%);padding:12px;box-sizing:border-box}}
     .shop-top{{background:rgba(8,30,55,.92);border:2px solid #4a7ba6;border-radius:10px;padding:10px;text-align:center;color:#fff;font-weight:900;font-size:20px}}
@@ -667,7 +668,7 @@ def shop():
     .c-char{{background:linear-gradient(180deg,#4a2a0a,#c98a2a);border-color:#ffcc00}}
     </style>
     <div class="shop-wrap">
-      <div class="shop-top">🛒 МАГАЗИН — {LOCATIONS.get(session.get("current_loc","lager"),{{}}).get("name","Лагерь")}</div>
+      <div class="shop-top">🛒 МАГАЗИН — {cur_loc_name}</div>
       <div class="shop-balance"><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div>
       <a href="/shop/weapon" class="shop-btn c-weapon">🗡️ Оружие</a>
       <a href="/shop/armor" class="shop-btn c-armor">🛡️ Броня</a>
