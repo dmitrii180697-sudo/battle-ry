@@ -9,6 +9,14 @@ XP_TABLE = [0, 0, 100, 300, 700, 1400, 2600, 4600, 7900, 13300, 22100, 36400, 59
 MAX_LVL = 21
 ADMIN_LOGIN = "admin"
 
+# ===== ADMIN BLUEPRINT - НЕ ЛОМАЕТ ИГРУ ЕСЛИ ПАПКИ НЕТ =====
+try:
+    from admin import admin_bp
+    app.register_blueprint(admin_bp)
+except Exception as e:
+    print(f"Admin blueprint not loaded: {e} - игра работает без новой админки, старая /admin работает")
+# =========================
+
 def get_lvl_by_xp(xp):
     lvl = 1
     for i in range(1, MAX_LVL + 1):
@@ -58,7 +66,6 @@ def init_db():
         if DATABASE_URL:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id SERIAL PRIMARY KEY, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INT DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
             cur.execute("CREATE TABLE IF NOT EXISTS chat_messages (id SERIAL PRIMARY KEY, uid INT, tab TEXT DEFAULT 'all', text TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)")
-            # === БОЙ: таблица для незавершённых боёв ===
             cur.execute("CREATE TABLE IF NOT EXISTS fights (uid INT PRIMARY KEY, enemy TEXT, enemy_hp INT, enemy_max INT, enemy_dmg_min INT, enemy_dmg_max INT, enemy_img TEXT, enemy_name TEXT, my_hp INT, hit_count INT DEFAULT 0, super_used INT DEFAULT 0, super_hits INT DEFAULT 0, shield_active BOOLEAN DEFAULT FALSE, reward_g INT DEFAULT 0, reward_s INT DEFAULT 0, reward_r INT DEFAULT 0, last_seen BIGINT DEFAULT 0)")
         else:
             cur.execute("CREATE TABLE IF NOT EXISTS players (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, login TEXT UNIQUE, password TEXT, gold INT DEFAULT 15, silver INT DEFAULT 50, rubin INT DEFAULT 0, exp INT DEFAULT 0, level INT DEFAULT 1, hp INTEGER DEFAULT 20, wins INT DEFAULT 1, losses INT DEFAULT 0)")
@@ -67,7 +74,6 @@ def init_db():
         conn.commit(); cur.close(); conn.close()
     except Exception as e: print(f"DB INIT ERROR: {e}")
 init_db()
-
 # ===== ФУНКЦИИ БОЯ (сохранение в БД, бой продолжается офлайн) =====
 def get_fight_db(uid):
     if not uid: return None
@@ -77,7 +83,6 @@ def get_fight_db(uid):
         cur.execute(q, (uid,))
         row = cur.fetchone(); cur.close(); conn.close()
         if not row: return None
-        # RealDictCursor / sqlite Row -> dict
         if isinstance(row, dict): return dict(row)
         try: return dict(row)
         except: return {"uid": row[0], "enemy": row[1], "enemy_hp": row[2], "enemy_max": row[3], "enemy_dmg_min": row[4], "enemy_dmg_max": row[5], "enemy_img": row[6], "enemy_name": row[7], "my_hp": row[8], "hit_count": row[9], "super_used": row[10], "super_hits": row[11], "shield_active": row[12], "reward_g": row[13], "reward_s": row[14], "reward_r": row[15], "last_seen": row[16]}
@@ -104,7 +109,6 @@ def clear_fight_db(uid):
     except: pass
 
 def apply_offline_damage(uid, fight):
-    # Монстр бьёт каждые 8 секунд, пока игрока нет. Максимум 5 ударов за одно возвращение.
     if not fight: return fight
     now = int(time.time())
     last = int(fight.get("last_seen") or now)
@@ -114,7 +118,6 @@ def apply_offline_damage(uid, fight):
     dmg_total = 0
     for _ in range(hits):
         dmg_total += random.randint(int(fight.get("enemy_dmg_min",2)), int(fight.get("enemy_dmg_max",4)))
-    # если был щит - один удар блокируется
     if fight.get("shield_active"):
         dmg_total = max(0, dmg_total - random.randint(int(fight.get("enemy_dmg_min",2)), int(fight.get("enemy_dmg_max",4))))
         fight["shield_active"] = False
@@ -127,13 +130,13 @@ def apply_offline_damage(uid, fight):
 # === ЗАПРЕТ ВЫХОДА ИЗ БОЯ ===
 @app.before_request
 def block_exit_during_fight():
-    # Разрешённые маршруты во время боя
     allowed = {"static_files", "fight", "fight_battle", "root", "login", "reg", None}
-    # static
     if request.path.startswith("/static/"): return None
+    if request.path.startswith("/admin"): return None
     if "uid" not in session: return None
     if request.endpoint in allowed: return None
-    # если есть активный бой - обратно в бой
+    # админка не блокируется боем - иначе админ не сможет выйти из боя
+    if request.endpoint and request.endpoint.startswith("admin"): return None
     f = get_fight_db(session.get("uid"))
     if f and int(f.get("enemy_hp", 1)) > 0 and int(f.get("my_hp", 1)) > 0:
         return redirect("/fight_battle")
@@ -181,22 +184,18 @@ def get_player(uid):
         if DATABASE_URL: cur.execute("SELECT * FROM players WHERE id=%s",(uid,))
         else: cur.execute("SELECT * FROM players WHERE id=?",(uid,))
         row = cur.fetchone()
-        # получаем названия колонок
         cols = [d[0] for d in cur.description] if cur.description else []
         cur.close(); conn.close()
         if not row: return None
-        # превращаем в dict, чтобы везде работал p.get("...")
         if isinstance(row, dict):
             return row
         try:
-            # sqlite Row / psycopg Row умеют .keys()
             return dict(row)
         except:
             return {cols[i]: row[i] for i in range(len(cols))}
     except: return None
-# === ИНВЕНТАРЬ ===
-import json as _json
 
+# === ИНВЕНТАРЬ ===
 def ensure_inv_columns():
     try:
         conn = get_db(); cur = conn.cursor()
@@ -217,25 +216,26 @@ ensure_inv_columns()
 
 def get_inv(p):
     if not p: return []
-    try: return _json.loads(p.get("inventory") or "[]")
+    try: return json.loads(p.get("inventory") or "[]")
     except: return []
 
 def get_eq(p):
     if not p: return {}
-    try: return _json.loads(p.get("equipped") or "{}")
+    try: return json.loads(p.get("equipped") or "{}")
     except: return {}
 
 def save_inv(uid, inv, eq):
     conn = get_db(); cur = conn.cursor()
     if DATABASE_URL:
-        cur.execute("UPDATE players SET inventory=%s, equipped=%s WHERE id=%s", (_json.dumps(inv), _json.dumps(eq), uid))
+        cur.execute("UPDATE players SET inventory=%s, equipped=%s WHERE id=%s", (json.dumps(inv), json.dumps(eq), uid))
     else:
-        cur.execute("UPDATE players SET inventory=?, equipped=? WHERE id=?", (_json.dumps(inv), _json.dumps(eq), uid))
+        cur.execute("UPDATE players SET inventory=?, equipped=? WHERE id=?", (json.dumps(inv), json.dumps(eq), uid))
     conn.commit(); cur.close(); conn.close()
 
 def find_item_by_id(item_id):
     data = load_json("shop")
     for cat, lst in data.items():
+        if not isinstance(lst, list): continue
         for it in lst:
             if str(it.get("id")) == str(item_id):
                 it = dict(it); it["cat"] = cat
@@ -267,6 +267,7 @@ def total_stats(p):
                 bonus[k] += int(it.get(k) or 0)
     return bonus
 
+# ЕДИНСТВЕННЫЙ is_admin - больше дублей нет!
 def is_admin():
     if "uid" not in session: return False
     p = get_player(session["uid"])
@@ -286,7 +287,6 @@ def vals(p):
 def add_win(uid):
     try:
         rg = session.get("reward_g", 0); rs = session.get("reward_s", 0); rr = session.get("reward_r", 0)
-        # если награда в бое из БД - берём оттуда
         f = get_fight_db(uid)
         if f:
             rg = int(f.get("reward_g", rg or 0)); rs = int(f.get("reward_s", rs or 0)); rr = int(f.get("reward_r", rr or 0))
@@ -316,8 +316,7 @@ def add_loss(uid):
         conn.commit(); cur.close(); conn.close()
         clear_fight_db(uid)
     except: pass
-
-BASE_CSS = """
+    BASE_CSS = """
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
 *{box-sizing:border-box}
@@ -383,7 +382,6 @@ def login():
         uid = row["id"] if isinstance(row, dict) or hasattr(row,'get') else row[0]
         if check_password_hash(hpw, pw):
             session["uid"] = uid; session["my_hp"] = 20; session["current_loc"] = "lager"
-            # если был незавершённый бой - сразу в бой
             if get_fight_db(uid):
                 return redirect("/fight_battle")
             return redirect("/game")
@@ -413,12 +411,7 @@ def map_page():
     for code, info in LOCATIONS.items():
         if code == "promysel": continue
         links += f'<a href="/loc/{code}" style="display:block;background:rgba(8,30,55,.92);border:2px solid #3aa0ff;padding:16px;color:#fff;text-decoration:none;font-size:20px;font-weight:bold;border-radius:8px;margin-bottom:10px">{info["name"]}</a>'
-    html = f"""
-    <div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh;background:#1a0e0a;color:#fff">
-    <div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;text-align:center"><h3 style="color:#fff;margin:0">📍 КАРТА МИРА</h3></div><br>
-    {links}
-    <a href="/game" style="display:block;background:#5a3e22;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;border-radius:8px">← Вернуться в игру</a></div>
-    """
+    html = f"""<div style="max-width:480px;margin:0 auto;padding:10px;min-height:100vh;background:#1a0e0a;color:#fff"><div style="background:rgba(8,30,55,.92);border:2px solid #4a7ba6;padding:12px;text-align:center"><h3 style="color:#fff;margin:0">📍 КАРТА МИРА</h3></div><br>{links}<a href="/game" style="display:block;background:#5a3e22;color:#fff;text-align:center;padding:14px;text-decoration:none;font-weight:bold;border-radius:8px">← Вернуться в игру</a></div>"""
     return render_page(html, True)
 
 @app.route("/game")
@@ -439,7 +432,7 @@ def game():
         lvl_exp = XP_TABLE[l+1]
         exp_per = int((exp - XP_TABLE[l]) * 100 / max(1, (XP_TABLE[l+1] - XP_TABLE[l])))
         exp_per = max(0, min(100, exp_per))
-    admin_btn = '<a href="/admin" style="display:block;background:linear-gradient(#ff0000,#8b0000);color:#fff;text-align:center;padding:12px;text-decoration:none;font-weight:900;border-radius:8px;margin:8px 0;border:2px solid gold">👑 АДМИН ПАНЕЛЬ</a>' if is_admin() else ""
+    admin_btn = '<a href="/admin" style="display:block;background:linear-gradient(#ff0000,#8b0000);color:#fff;text-align:center;padding:12px;text-decoration:none;font-weight:900;border-radius:8px;margin:8px 0;border:2px solid gold">👑 АДМИН ПАНЕЛЬ</a><a href="/admin/items" style="display:block;background:#111;color:#ffd700;text-align:center;padding:10px;text-decoration:none;font-weight:900;border-radius:8px;margin:8px 0;border:2px solid #ffd700">🛒 АДМИН: ВЕЩИ</a>' if is_admin() else ""
     html = f'''
     <div style="max-width:480px;margin:0 auto;min-height:100vh;background:url('{bg}') center/cover no-repeat;display:flex;flex-direction:column;padding:10px;box-sizing:border-box">
       <div style="background:rgba(8,30,55,.9);border:2px solid #4a7ba6;padding:8px;text-align:center;color:#fff;font-weight:900;font-size:22px;border-radius:8px">BATTLE</div>
@@ -479,7 +472,6 @@ def game():
 
 @app.route("/logout")
 def logout():
-    # ВАЖНО: бой НЕ удаляем! Если вышел во время боя - бой продолжится, при следующем входе кикнет обратно в бой
     session.clear(); return redirect("/")
 
 def _monster_cards(monsters, loc_code):
@@ -513,28 +505,17 @@ def go_loc(code):
 @app.route("/fight/<monster>")
 def fight(monster):
     if "uid" not in session: return redirect("/")
-    # если уже есть бой - в него, новый не создаём
     existing = get_fight_db(session["uid"])
     if existing and int(existing.get("enemy_hp", 0)) > 0 and int(existing.get("my_hp", 0)) > 0:
         return redirect("/fight_battle")
     MONSTERS = get_monsters()
     p = get_player(session["uid"]); l, h, r, g, s_ = vals(p)
     cfg = MONSTERS.get(monster, MONSTERS["warrior"])
-    # сохраняем бой в БД
-    save_fight_db(session["uid"], {
-        "enemy": monster, "enemy_hp": cfg.get("hp", 20), "enemy_max": cfg.get("hp", 20),
-        "enemy_dmg_min": cfg.get("dmg", [2,4])[0], "enemy_dmg_max": cfg.get("dmg", [2,4])[1],
-        "enemy_img": cfg.get("img", "ancient_warrior.png"), "enemy_name": cfg["name"],
-        "my_hp": h, "hit_count": 0, "super_used": 0, "super_hits": 0, "shield_active": False,
-        "reward_g": cfg.get("gold", 2), "reward_s": cfg.get("silver", 10), "reward_r": cfg.get("rubin", 0),
-        "last_seen": int(time.time())
-    })
-    # для совместимости со старым кодом - дублируем в session
+    save_fight_db(session["uid"], {"enemy": monster, "enemy_hp": cfg.get("hp", 20), "enemy_max": cfg.get("hp", 20), "enemy_dmg_min": cfg.get("dmg", [2,4])[0], "enemy_dmg_max": cfg.get("dmg", [2,4])[1], "enemy_img": cfg.get("img", "ancient_warrior.png"), "enemy_name": cfg["name"], "my_hp": h, "hit_count": 0, "super_used": 0, "super_hits": 0, "shield_active": False, "reward_g": cfg.get("gold", 2), "reward_s": cfg.get("silver", 10), "reward_r": cfg.get("rubin", 0), "last_seen": int(time.time())})
     session["enemy_type"] = cfg["name"]; session["enemy_hp"] = cfg.get("hp", 20); session["enemy_max"] = cfg.get("hp", 20)
     session["enemy_dmg"] = cfg.get("dmg", [2,4]); session["enemy_img"] = cfg.get("img", "ancient_warrior.png")
     session["my_hp"] = h; session["hit_count"] = 0; session["rewarded"] = False
-    session["super_used"] = 0; session["super_hits"] = 0
-    session["shield_active"] = False
+    session["super_used"] = 0; session["super_hits"] = 0; session["shield_active"] = False
     session["reward_g"] = cfg.get("gold", 2); session["reward_s"] = cfg.get("silver", 10); session["reward_r"] = cfg.get("rubin", 0)
     session.modified = True
     return redirect("/fight_battle")
@@ -543,35 +524,23 @@ def fight(monster):
 def fight_battle():
     if "uid" not in session: return redirect("/")
     uid = session["uid"]
-    # бой берём из БД - он главный
     f = get_fight_db(uid)
     if not f:
-        # нет боя в БД - пробуем старый session-бой, если его нет - в промысел
         if "enemy_hp" not in session: return redirect("/promysel")
         f = {"enemy": "warrior", "enemy_hp": session.get("enemy_hp", 20), "enemy_max": session.get("enemy_max", 20), "enemy_dmg_min": session.get("enemy_dmg", [2,4])[0], "enemy_dmg_max": session.get("enemy_dmg", [2,4])[1], "enemy_img": session.get("enemy_img", "ancient_warrior.png"), "enemy_name": session.get("enemy_type", "Древний Воин"), "my_hp": session.get("my_hp", 20), "hit_count": session.get("hit_count", 0), "super_used": session.get("super_used", 0), "super_hits": session.get("super_hits", 0), "shield_active": session.get("shield_active", False), "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0), "last_seen": int(time.time())}
         save_fight_db(uid, f)
-    # === бой продолжается пока тебя нет ===
     f = apply_offline_damage(uid, f)
     if int(f.get("my_hp", 1)) <= 0:
-        # умер пока был офлайн
-        add_loss(uid)
-        # clear уже в add_loss, но session тоже чистим
-        session.pop("enemy_hp", None)
-        return redirect("/game")
-    # сохраняем обновлённое время
-    f["last_seen"] = int(time.time())
-    save_fight_db(uid, f)
-    # синхронизируем session для шаблона
+        add_loss(uid); session.pop("enemy_hp", None); return redirect("/game")
+    f["last_seen"] = int(time.time()); save_fight_db(uid, f)
     session["enemy_hp"] = int(f["enemy_hp"]); session["my_hp"] = int(f["my_hp"]); session["hit_count"] = int(f.get("hit_count",0))
     session["super_used"] = int(f.get("super_used",0)); session["super_hits"] = int(f.get("super_hits",0)); session["shield_active"] = bool(f.get("shield_active"))
     session["reward_g"] = int(f.get("reward_g",0)); session["reward_s"] = int(f.get("reward_s",0)); session["reward_r"] = int(f.get("reward_r",0))
     session["enemy_type"] = f.get("enemy_name"); session["enemy_img"] = f.get("enemy_img"); session["enemy_max"] = int(f.get("enemy_max",20))
-
     p = get_player(uid); lvl, my_max_hp, rubin, gold, silver = vals(p)
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
         m = data.get("m") or request.form.get("m", "hit")
-        # === ВЫХОД ИЗ БОЯ ЗАПРЕЩЁН ===
         if m == "run":
             return jsonify({"status": "blocked", "msg": "⛔ Из боя нельзя выйти! Бейся до конца!", "enemy_hp": int(f["enemy_hp"]), "my_hp": int(f["my_hp"]), "finished": False})
         cur_my = int(f["my_hp"]); cur_en = int(f["enemy_hp"]); hit_cnt = int(f.get("hit_count",0))
@@ -580,32 +549,21 @@ def fight_battle():
         def enemy_hit():
             nonlocal cur_my
             if f.get("shield_active"):
-                f["shield_active"] = False
-                return 0
+                f["shield_active"] = False; return 0
             emin, emax = int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4))
-            d = random.randint(emin, emax)
-            cur_my = max(0, cur_my - d)
-            return d
+            d = random.randint(emin, emax); cur_my = max(0, cur_my - d); return d
         if m == "shield" and cur_my > 0 and cur_en > 0:
-            f["shield_active"] = True
-            edmg = enemy_hit()
+            f["shield_active"] = True; edmg = enemy_hit()
         elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
-            # ТОЛЬКО ход монстра, отдельно от твоего
             if f.get("shield_active"):
-                edmg = 0
-                f["shield_active"] = False
+                edmg = 0; f["shield_active"] = False
             else:
-                edmg = random.randint(int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4)))
-                cur_my = max(0, cur_my - edmg)
+                edmg = random.randint(int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4))); cur_my = max(0, cur_my - edmg)
             dmg = 0
         elif m == "hit" and cur_my > 0 and cur_en > 0:
-            # ТОЛЬКО твой ход, монстр пока НЕ бьёт
-                dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1
-                edmg = 0
+            dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1; edmg = 0
         elif m == "super" and cur_my > 0 and cur_en > 0 and super_used < 4 and super_hits >= 5:
-            # ТОЛЬКО твой супер, без ответки
-            dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0
-            edmg = 0
+            dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0; edmg = 0
         f["enemy_hp"] = cur_en; f["my_hp"] = cur_my; f["hit_count"] = hit_cnt
         f["super_used"] = super_used; f["super_hits"] = super_hits; f["last_seen"] = int(time.time())
         save_fight_db(uid, f)
@@ -614,7 +572,6 @@ def fight_battle():
         need_for_next = 0 if super_used >= 4 else (5 - super_hits)
         finished = False; is_win = False
         if cur_en <= 0:
-            # победа - очищаем бой, теперь можно выйти
             session["reward_g"] = int(f.get("reward_g",0)); session["reward_s"] = int(f.get("reward_s",0)); session["reward_r"] = int(f.get("reward_r",0))
             add_win(uid); session["rewarded"] = True; finished = True; is_win = True
         elif cur_my <= 0:
@@ -625,11 +582,7 @@ def fight_battle():
     super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
     need_for_next = 0 if super_used >= 4 else (5 - super_hits)
     my_per = int(cur_my_hp * 100 / my_max_hp) if my_max_hp else 0; enemy_per = int(cur_enemy_hp * 100 / enemy_max_hp) if enemy_max_hp else 0
-    return render_template("battle.html",
-        lvl=lvl, enemy_type=enemy_name, player_img="barbarian_game_size.png",
-        enemy_img=enemy_img, my_hp=cur_my_hp, my_max_hp=my_max_hp, my_per=my_per,
-        enemy_hp=cur_enemy_hp, enemy_max=enemy_max_hp, enemy_per=enemy_per,
-        hit_cnt=hit_cnt, super_used=super_used, need_for_next=need_for_next)
+    return render_template("battle.html", lvl=lvl, enemy_type=enemy_name, player_img="barbarian_game_size.png", enemy_img=enemy_img, my_hp=cur_my_hp, my_max_hp=my_max_hp, my_per=my_per, enemy_hp=cur_enemy_hp, enemy_max=enemy_max_hp, enemy_per=enemy_per, hit_cnt=hit_cnt, super_used=super_used, need_for_next=need_for_next)
 
 BAD_WORDS = ["бля", "хуй", "пизд", "сука", "ебан", "нахуй", "fuck", "shit"]
 CHAT_SPAM = {}
@@ -730,7 +683,6 @@ def api_chat():
         return jsonify({"ok":True})
     except Exception as e: return jsonify({"ok":False,"msg":str(e)})
 
-# ===== МАГАЗИН ИЗ data/shop.json - НОВЫЙ =====
 @app.route("/shop")
 def shop():
     if "uid" not in session: return redirect("/")
@@ -776,26 +728,16 @@ def shop_cat(cat):
     cur_loc = session.get("current_loc","lager")
     shop_data = load_json("shop")
     items = shop_data.get(cat, [])
-
-    # 1. ФИЛЬТР ПО ЛОКАЦИИ - в каждой локации свой товар
     filtered = []
     for it in items:
         loc = it.get("location")
-        if loc and loc != cur_loc:
-            continue
+        if loc and loc != cur_loc: continue
         filtered.append(it)
     items = filtered
-
-    # 2. СОРТИРОВКА
-    if sort == "damage":
-        items = sorted(items, key=lambda x: -int(x.get("damage",0)))
-    elif sort == "armor":
-        items = sorted(items, key=lambda x: -int(x.get("armor",0)))
-    elif sort == "dodge":
-        items = sorted(items, key=lambda x: -int(x.get("dodge",0)))
-    elif sort == "price":
-        items = sorted(items, key=lambda x: int(x.get("gold",0))*100 + int(x.get("silver",0)))
-
+    if sort == "damage": items = sorted(items, key=lambda x: -int(x.get("damage",0)))
+    elif sort == "armor": items = sorted(items, key=lambda x: -int(x.get("armor",0)))
+    elif sort == "dodge": items = sorted(items, key=lambda x: -int(x.get("dodge",0)))
+    elif sort == "price": items = sorted(items, key=lambda x: int(x.get("gold",0))*100 + int(x.get("silver",0)))
     if not items:
         cards = '<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">В этой локации пока нет товаров этой категории.<br>Сходи в другую локацию или добавь товар в shop.json с location = '+cur_loc+'</div>'
     else:
@@ -809,8 +751,7 @@ def shop_cat(cat):
             if it.get("damage"): stats += f'⚔️{it["damage"]} '
             if it.get("armor"): stats += f'🛡️{it["armor"]} '
             if it.get("dodge"): stats += f'💨{it["dodge"]} '
-            lvl = it.get("level",1)
-            icon = it.get("icon","📦")
+            lvl = it.get("level",1); icon = it.get("icon","📦")
             cards += f'''
             <div style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid #5a3e22;border-radius:10px;padding:8px;text-align:center;position:relative;color:#3d2817">
                 <div style="position:absolute;top:4px;left:6px;font-size:12px">⭐{lvl}</div>
@@ -821,7 +762,6 @@ def shop_cat(cat):
                 <form method="post" action="/shop/buy/{cat}/{it.get("id","")}"><button style="width:100%;background:#ff9c00;color:#fff;padding:6px;border:0;border-radius:6px;font-weight:bold">Купить</button></form>
             </div>'''
         cards += '</div>'
-
     sorts_html = f'''
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
       <a href="/shop/{cat}?sort=none" style="padding:7px 10px;background:{'#ff9c00' if sort=='none' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">Нет</a>
@@ -842,7 +782,6 @@ def shop_buy(cat, item_id):
     items = shop_data.get(cat, [])
     item = next((x for x in items if str(x.get("id")) == str(item_id)), None)
     if not item: return redirect(f"/shop/{cat}?msg=Товар не найден")
-    # Проверка локации - нельзя купить чужой товар через прямую ссылку
     cur_loc = session.get("current_loc","lager")
     if item.get("location") and item.get("location") != cur_loc:
         return redirect(f"/shop/{cat}?msg=Этот товар не продается в этой локации!")
@@ -855,13 +794,13 @@ def shop_buy(cat, item_id):
         if DATABASE_URL: cur.execute("UPDATE players SET gold=gold-%s, silver=silver-%s, rubin=rubin-%s WHERE id=%s", (need_g, need_s, need_r, session["uid"]))
         else: cur.execute("UPDATE players SET gold=gold-?, silver=silver-?, rubin=rubin-? WHERE id=?", (need_g, need_s, need_r, session["uid"]))
         conn.commit(); cur.close(); conn.close()
-        # --- выдаем вещь в рюкзак ---
         p2 = get_player(session["uid"])
         inv = get_inv(p2); eq = get_eq(p2)
         inv.append({"id": item.get("id"), "cat": cat})
         save_inv(session["uid"], inv, eq)
     except Exception as e: return redirect(f"/shop/{cat}?msg=Ошибка: {e}")
     return redirect(f"/shop/{cat}?msg=✅ Куплено: {item.get('name','')}")
+
 @app.route("/hero")
 def hero():
     if "uid" not in session: return redirect("/")
@@ -874,12 +813,8 @@ def hero():
     losses = int(p.get("losses",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     admin_tag = " 👑 ADMIN" if is_admin() else ""
     hp = l*10 + bonus.get("hp",0); exp_need = l*100
-    dmg = l + bonus.get("damage",0)
-    armor = l + bonus.get("armor",0)
-    dodge = l + bonus.get("dodge",0)
-    acc = l + bonus.get("accuracy",0) + bonus.get("acc",0)
-    block = l + bonus.get("block",0)
-    stun = bonus.get("stun",0)
+    dmg = l + bonus.get("damage",0); armor = l + bonus.get("armor",0); dodge = l + bonus.get("dodge",0)
+    acc = l + bonus.get("accuracy",0) + bonus.get("acc",0); block = l + bonus.get("block",0); stun = bonus.get("stun",0)
     return render_page(f'''<div class="wrap" style="padding:15px">
     <h2 style="text-align:center">🧝 Герой {nick}{admin_tag}</h2>
     <p style="text-align:center">Уровень {l} / 21 | Опыт {exp} / {exp_need} | Победы {wins} / Поражения {losses}</p>
@@ -896,23 +831,13 @@ def hero():
     <br><div style="text-align:center"><a href="/game"><button>⬅ Назад</button></a></div>
     <a href="/hero/equipment" style="display:block;background:linear-gradient(180deg,#ffb84d,#ff7a00);color:#fff;text-decoration:none;font-weight:900;font-size:20px;padding:16px;border-radius:12px;border:2px solid #000;text-align:center;margin:12px 0">🧥 СНАРЯЖЕНИЕ</a>
     </div>''')
-SLOTS = [
-    ("weapon","🗡️","Оружие"),
-    ("shield","🛡️","Щиты"),
-    ("helmet","🪖","Шлемы"),
-    ("gloves","🧤","Перчатки"),
-    ("armor","🦺","Доспехи"),
-    ("boots","🥾","Обувь"),
-    ("amulet","🔮","Амулеты"),
-    ("ring","💍","Кольца"),
-    ("elixir","🧪","Эликсиры"),
-]
+
+SLOTS = [("weapon","🗡️","Оружие"),("shield","🛡️","Щиты"),("helmet","🪖","Шлемы"),("gloves","🧤","Перчатки"),("armor","🦺","Доспехи"),("boots","🥾","Обувь"),("amulet","🔮","Амулеты"),("ring","💍","Кольца"),("elixir","🧪","Эликсиры"),]
 
 @app.route("/hero/equipment")
 def hero_equipment():
     if "uid" not in session: return redirect("/")
-    p = get_player(session["uid"])
-    inv = get_inv(p); eq = get_eq(p)
+    p = get_player(session["uid"]); inv = get_inv(p); eq = get_eq(p)
     counts = {s:0 for s,_,_ in SLOTS}
     for e in inv:
         iid = e.get("id") if isinstance(e, dict) else e
@@ -922,24 +847,16 @@ def hero_equipment():
             if sl in counts: counts[sl] += 1
     rows = ""
     for slot, icon, name in SLOTS:
-        worn = eq.get(slot)
-        worn_it = find_item_by_id(worn) if worn else None
+        worn = eq.get(slot); worn_it = find_item_by_id(worn) if worn else None
         worn_txt = f'<span style="color:#7aff8a">✅ {worn_it.get("name") if worn_it else ""}</span>' if worn_it else '<span style="color:#888">пусто</span>'
         cnt = counts[slot]
-        rows += f'''
-        <a href="/hero/equipment/{slot}" style="text-decoration:none">
-        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,#2a4a6a,#162c46);border:2px solid #4a7ba6;border-radius:12px;padding:14px;margin-bottom:8px">
-          <div style="width:48px;height:48px;background:rgba(0,0,0,.35);border:2px solid #e8c268;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px">{icon}</div>
-          <div style="flex:1;text-align:left"><div style="color:#fff;font-weight:900;font-size:17px">[{cnt}] {name}</div><div style="font-size:12px">{worn_txt}</div></div>
-          <div style="color:#e8c268;font-size:22px">›</div>
-        </div></a>'''
+        rows += f'''<a href="/hero/equipment/{slot}" style="text-decoration:none"><div style="display:flex;align-items:center;gap:12px;background:linear-gradient(180deg,#2a4a6a,#162c46);border:2px solid #4a7ba6;border-radius:12px;padding:14px;margin-bottom:8px"><div style="width:48px;height:48px;background:rgba(0,0,0,.35);border:2px solid #e8c268;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:26px">{icon}</div><div style="flex:1;text-align:left"><div style="color:#fff;font-weight:900;font-size:17px">[{cnt}] {name}</div><div style="font-size:12px">{worn_txt}</div></div><div style="color:#e8c268;font-size:22px">›</div></div></a>'''
     return render_page(f'<div style="max-width:480px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#0a1e35,#122c4d);padding:12px"><div style="background:#0a1e35;border:2px solid #e8c268;border-radius:12px;padding:12px;text-align:center;color:#fff;font-weight:900;font-size:20px">🧥 СНАРЯЖЕНИЕ</div><div style="margin-top:12px">{rows}</div><a href="/hero" style="display:block;text-align:center;margin-top:10px;color:#f5e6b0;text-decoration:none">← К герою</a></div>', False)
 
 @app.route("/hero/equipment/<slot>")
 def hero_equipment_slot(slot):
     if "uid" not in session: return redirect("/")
-    p = get_player(session["uid"])
-    inv = get_inv(p); eq = get_eq(p)
+    p = get_player(session["uid"]); inv = get_inv(p); eq = get_eq(p)
     slot_name = dict((s,n) for s,_,n in SLOTS).get(slot, slot)
     slot_icon = dict((s,i) for s,i,_ in SLOTS).get(slot, "📦")
     cards = ""; found = False
@@ -947,8 +864,7 @@ def hero_equipment_slot(slot):
         iid = e.get("id") if isinstance(e, dict) else e
         it = find_item_by_id(iid)
         if not it or get_slot(it) != slot: continue
-        found = True
-        is_worn = eq.get(slot) == str(iid)
+        found = True; is_worn = eq.get(slot) == str(iid)
         cards += f'''<div style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid {"#2ecc71" if is_worn else "#5a3e22"};border-radius:12px;padding:10px;text-align:center;color:#3d2817"><div style="font-size:36px">{it.get("icon","📦")}</div><div style="font-size:13px;font-weight:bold">{it.get("name")}</div><div style="font-size:11px">⚔️{it.get("damage",0)} 🛡️{it.get("armor",0)} 💨{it.get("dodge",0)}</div><form method="post" action="{"/unequip/"+slot if is_worn else f"/equip/{slot}/{iid}"}" style="margin-top:6px"><button style="width:100%;background:{"#555" if is_worn else "#2ecc71"};color:#fff;padding:8px;border:0;border-radius:8px;font-weight:bold">{"Снять" if is_worn else "Надеть"}</button></form></div>'''
     if not found:
         cards = '<div style="background:#fdf6c8;padding:20px;border-radius:12px;text-align:center;color:#333">Тут пусто.<br>Купи вещь в магазине 🛒</div>'
@@ -959,19 +875,15 @@ def hero_equipment_slot(slot):
 @app.route("/equip/<cat>/<item_id>", methods=["POST"])
 def equip(cat, item_id):
     if "uid" not in session: return redirect("/")
-    p = get_player(session["uid"])
-    inv = get_inv(p); eq = get_eq(p)
-    eq[cat] = str(item_id)
-    save_inv(session["uid"], inv, eq)
+    p = get_player(session["uid"]); inv = get_inv(p); eq = get_eq(p)
+    eq[cat] = str(item_id); save_inv(session["uid"], inv, eq)
     return redirect(f"/hero/equipment/{cat}")
 
 @app.route("/unequip/<cat>", methods=["POST"])
 def unequip(cat):
     if "uid" not in session: return redirect("/")
-    p = get_player(session["uid"])
-    inv = get_inv(p); eq = get_eq(p)
-    eq.pop(cat, None)
-    save_inv(session["uid"], inv, eq)
+    p = get_player(session["uid"]); inv = get_inv(p); eq = get_eq(p)
+    eq.pop(cat, None); save_inv(session["uid"], inv, eq)
     return redirect(f"/hero/equipment/{cat}")
 
 @app.route("/player/<int:pid>")
@@ -989,8 +901,7 @@ def player_view(pid):
     hp = p.get("hp") if isinstance(p,dict) else p[9]
     wins = p.get("wins") if isinstance(p,dict) else p[10]
     losses = p.get("losses") if isinstance(p,dict) else p[11]
-    is_me = (pid == session["uid"])
-    admin_tag = " 👑 АДМИН" if lg == ADMIN_LOGIN else ""
+    is_me = (pid == session["uid"]); admin_tag = " 👑 АДМИН" if lg == ADMIN_LOGIN else ""
     return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>👤 {nick}{admin_tag}</h2><p style="color:#666">@{lg} {"(Это ты!)" if is_me else ""}</p><img src="/static/barbarian_game_size.png" style="height:180px"><div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px;text-align:left"><b>Уровень:</b> {lvl} / 21<br><b>HP:</b> {hp}<br><b>Опыт:</b> {exp}<br><b>Побед:</b> {wins} | <b>Поражений:</b> {losses}<br><b>Золото:</b> {gold}🪙 {silver}⚪ {rubin}💎</div><a href="/online" class="btn-orange">← К игрокам</a><a href="/game" class="btn-orange">← На главную</a></div>', True)
 
 def _player_card(p, rank=None):
@@ -1055,29 +966,16 @@ def bank():
             conn=get_db(); cur=conn.cursor()
             if action=="exchange" and r>=amount:
                 q = "UPDATE players SET rubin=rubin-%s, gold=gold+%s WHERE id=%s" if DATABASE_URL else "UPDATE players SET rubin=rubin-?, gold=gold+? WHERE id=?"
-                cur.execute(q,(amount, amount*500, session["uid"]))
-                conn.commit()
+                cur.execute(q,(amount, amount*500, session["uid"])); conn.commit()
             cur.close(); conn.close()
             return redirect("/bank")
     return render_page(f'''<div class="wrap" style="padding:15px;text-align:center">
-    <h2>🏦 Банк</h2>
-    <p style="font-size:18px">💎 Кристаллов: {r} | 🪙 Золота: {g}</p>
-    <hr>
-    <h3>💎 Купить кристаллы</h3>
-    <p>100 💎 — 500 ₸</p>
-    <p>550 💎 — 2500 ₸</p>
-    <p>1200 💎 — 5000 ₸</p>
-    <p>3000 💎 — 10000 ₸</p>
-    <p style="color:#ffd700">Переведи на Kaspi и напиши админу свой ник!<br>Админ выдаст кристаллы вручную.</p>
-    <hr>
-    <h3>🔄 Обмен кристаллов на золото</h3>
-    <p>Курс: 1 💎 = 500 🪙</p>
-    <form method="post">
-      <input name="amount" type="number" placeholder="Сколько кристаллов" style="padding:10px;width:70%">
-      <br><br><button name="action" value="exchange" style="padding:10px 20px">Обменять на золото</button>
-    </form>
-    <br><a href="/game"><button>⬅ Назад</button></a>
-    </div>''')
+    <h2>🏦 Банк</h2><p style="font-size:18px">💎 Кристаллов: {r} | 🪙 Золота: {g}</p><hr>
+    <h3>💎 Купить кристаллы</h3><p>100 💎 — 500 ₸</p><p>550 💎 — 2500 ₸</p><p>1200 💎 — 5000 ₸</p><p>3000 💎 — 10000 ₸</p>
+    <p style="color:#ffd700">Переведи на Kaspi и напиши админу свой ник!<br>Админ выдаст кристаллы вручную.</p><hr>
+    <h3>🔄 Обмен кристаллов на золото</h3><p>Курс: 1 💎 = 500 🪙</p>
+    <form method="post"><input name="amount" type="number" placeholder="Сколько кристаллов" style="padding:10px;width:70%"><br><br><button name="action" value="exchange" style="padding:10px 20px">Обменять на золото</button></form>
+    <br><a href="/game"><button>⬅ Назад</button></a></div>''')
 
 @app.route("/pvp")
 def pvp():
@@ -1085,8 +983,7 @@ def pvp():
     try:
         conn=get_db(); cur=conn.cursor()
         q = "SELECT * FROM players WHERE id!=%s ORDER BY level DESC" if DATABASE_URL else "SELECT * FROM players WHERE id!=? ORDER BY level DESC"
-        cur.execute(q,(session["uid"],))
-        rows=cur.fetchall(); cur.close(); conn.close()
+        cur.execute(q,(session["uid"],)); rows=cur.fetchall(); cur.close(); conn.close()
     except: rows=[]
     items=""
     for r in rows:
@@ -1113,185 +1010,90 @@ def admin():
         try:
             if action == "give":
                 target_login = request.form.get("target_login","").strip()
-                add_gold = int(request.form.get("add_gold") or 0)
-                add_silver = int(request.form.get("add_silver") or 0)
-                add_rubin = int(request.form.get("add_rubin") or 0)
-                add_exp = int(request.form.get("add_exp") or 0)
-                add_level = int(request.form.get("add_level") or 0)
-                set_level = int(request.form.get("set_level") or 0)
+                add_gold = int(request.form.get("add_gold") or 0); add_silver = int(request.form.get("add_silver") or 0); add_rubin = int(request.form.get("add_rubin") or 0); add_exp = int(request.form.get("add_exp") or 0); add_level = int(request.form.get("add_level") or 0); set_level = int(request.form.get("set_level") or 0)
                 if DATABASE_URL: cur.execute("SELECT id, level, exp FROM players WHERE login=%s",(target_login,))
                 else: cur.execute("SELECT id, level, exp FROM players WHERE login=?",(target_login,))
                 row = cur.fetchone()
                 if row:
                     tid = row["id"] if isinstance(row,dict) else row[0]
-                    cur_lvl = int(row["level"] if isinstance(row,dict) else row[1] or 1)
-                    cur_exp = int(row["exp"] if isinstance(row,dict) else row[2] or 0)
+                    cur_lvl = int(row["level"] if isinstance(row,dict) else row[1] or 1); cur_exp = int(row["exp"] if isinstance(row,dict) else row[2] or 0)
                     new_lvl = cur_lvl
                     if set_level > 0: new_lvl = set_level
                     elif add_level != 0: new_lvl = cur_lvl + add_level
                     if new_lvl > MAX_LVL: new_lvl = MAX_LVL
                     if new_lvl < 1: new_lvl = 1
                     if set_level > 0 or add_level != 0:
-                        new_exp = XP_TABLE[new_lvl] + add_exp
-                        new_lvl = get_lvl_by_xp(new_exp)
+                        new_exp = XP_TABLE[new_lvl] + add_exp; new_lvl = get_lvl_by_xp(new_exp)
                         if new_lvl > MAX_LVL: new_lvl = MAX_LVL
                     else:
-                        new_exp = cur_exp + add_exp
-                        new_lvl = get_lvl_by_xp(new_exp)
+                        new_exp = cur_exp + add_exp; new_lvl = get_lvl_by_xp(new_exp)
                         if new_lvl > MAX_LVL: new_lvl = MAX_LVL
                         if new_exp > XP_TABLE[MAX_LVL]: new_exp = XP_TABLE[MAX_LVL]
                     if DATABASE_URL: cur.execute("UPDATE players SET gold=gold+%s, silver=silver+%s, rubin=rubin+%s, exp=%s, level=%s WHERE id=%s",(add_gold,add_silver,add_rubin,new_exp,new_lvl,tid))
                     else: cur.execute("UPDATE players SET gold=gold+?, silver=silver+?, rubin=rubin+?, exp=?, level=? WHERE id=?",(add_gold,add_silver,add_rubin,new_exp,new_lvl,tid))
-                    conn.commit()
-                    msg = f"✅ Выдано {target_login}: +{add_gold}🪙 +{add_silver}⚪ +{add_rubin}💎 +{add_exp} XP | Уровень теперь: {new_lvl} (было {cur_lvl})"
+                    conn.commit(); msg = f"✅ Выдано {target_login}: +{add_gold}🪙 +{add_silver}⚪ +{add_rubin}💎 +{add_exp} XP | Уровень теперь: {new_lvl} (было {cur_lvl})"
                 else: msg = "❌ Игрок не найден"
             elif action == "edit_player":
-                pid = int(request.form.get("pid"))
-                lvl = int(request.form.get("level") or 1)
+                pid = int(request.form.get("pid")); lvl = int(request.form.get("level") or 1)
                 if lvl > MAX_LVL: lvl = MAX_LVL
                 if lvl < 1: lvl = 1
                 exp = int(request.form.get("exp") or 0)
                 if exp > XP_TABLE[MAX_LVL]: exp = XP_TABLE[MAX_LVL]
-                gold = int(request.form.get("gold") or 0); silver = int(request.form.get("silver") or 0); rubin = int(request.form.get("rubin") or 0)
-                hp = int(request.form.get("hp") or 20); wins = int(request.form.get("wins") or 0)
+                gold = int(request.form.get("gold") or 0); silver = int(request.form.get("silver") or 0); rubin = int(request.form.get("rubin") or 0); hp = int(request.form.get("hp") or 20); wins = int(request.form.get("wins") or 0)
                 if DATABASE_URL: cur.execute("UPDATE players SET level=%s, exp=%s, gold=%s, silver=%s, rubin=%s, hp=%s, wins=%s WHERE id=%s",(lvl,exp,gold,silver,rubin,hp,wins,pid))
                 else: cur.execute("UPDATE players SET level=?, exp=?, gold=?, silver=?, rubin=?, hp=?, wins=? WHERE id=?",(lvl,exp,gold,silver,rubin,hp,wins,pid))
                 conn.commit(); msg = "✅ Игрок обновлён!"
             elif action == "edit_monster":
-                key = request.form.get("mkey")
-                monsters = get_monsters()
+                key = request.form.get("mkey"); monsters = get_monsters()
                 if key in monsters:
-                    m = monsters[key]
-                    m["hp"] = int(request.form.get("m_hp") or m["hp"])
-                    m["gold"] = int(request.form.get("m_gold") or 0)
-                    m["silver"] = int(request.form.get("m_silver") or 0)
-                    m["rubin"] = int(request.form.get("m_rubin") or 0)
-                    m["dmg"] = [int(request.form.get("m_dmg_min") or 2), int(request.form.get("m_dmg_max") or 4)]
-                    save_monster(key, m); msg = f"✅ Монстр {m['name']} обновлён! (сохранено в data/monsters.json)"
+                    m = monsters[key]; m["hp"] = int(request.form.get("m_hp") or m["hp"]); m["gold"] = int(request.form.get("m_gold") or 0); m["silver"] = int(request.form.get("m_silver") or 0); m["rubin"] = int(request.form.get("m_rubin") or 0); m["dmg"] = [int(request.form.get("m_dmg_min") or 2), int(request.form.get("m_dmg_max") or 4)]
+                    save_monster(key, m); msg = f"✅ Монстр {m['name']} обновлён!"
             elif action == "add_monster":
-                key = request.form.get("m_key","").strip().lower().replace(" ","_")
-                monsters = get_monsters()
+                key = request.form.get("m_key","").strip().lower().replace(" ","_"); monsters = get_monsters()
                 if key and key not in monsters:
-                    new_m = {
-                        "name": request.form.get("m_name","Новый монстр"),
-                        "img": request.form.get("m_img","ancient_warrior.png"),
-                        "hp": int(request.form.get("m_hp") or 50),
-                        "dmg": [int(request.form.get("m_dmg_min") or 2), int(request.form.get("m_dmg_max") or 5)],
-                        "gold": int(request.form.get("m_gold") or 2),
-                        "silver": int(request.form.get("m_silver") or 10),
-                        "rubin": int(request.form.get("m_rubin") or 0),
-                        "location": request.form.get("m_location","promysel")
-                    }
-                    save_monster(key, new_m)
-                    msg = f"✅ Монстр {new_m['name']} добавлен в {LOCATIONS.get(new_m['location'],{}).get('name', new_m['location'])}"
+                    new_m = {"name": request.form.get("m_name","Новый монстр"), "img": request.form.get("m_img","ancient_warrior.png"), "hp": int(request.form.get("m_hp") or 50), "dmg": [int(request.form.get("m_dmg_min") or 2), int(request.form.get("m_dmg_max") or 5)], "gold": int(request.form.get("m_gold") or 2), "silver": int(request.form.get("m_silver") or 10), "rubin": int(request.form.get("m_rubin") or 0), "location": request.form.get("m_location","promysel")}
+                    save_monster(key, new_m); msg = f"✅ Монстр {new_m['name']} добавлен"
                 else: msg = "❌ Такой ключ уже есть или пустой"
             elif action == "delete_monster":
-                key = request.form.get("mkey")
-                delete_monster(key); msg = f"✅ Монстр {key} удалён из файла"
+                key = request.form.get("mkey"); delete_monster(key); msg = f"✅ Монстр {key} удалён"
             elif action == "move_monster":
-                key = request.form.get("mkey")
-                monsters = get_monsters()
+                key = request.form.get("mkey"); monsters = get_monsters()
                 if key in monsters:
-                    monsters[key]["location"] = request.form.get("new_location","promysel")
-                    save_monster(key, monsters[key]); msg = f"✅ {monsters[key]['name']} перемещён в {monsters[key]['location']}"
+                    monsters[key]["location"] = request.form.get("new_location","promysel"); save_monster(key, monsters[key]); msg = f"✅ {monsters[key]['name']} перемещён"
         except Exception as e: msg = f"❌ Ошибка: {e}"
         cur.close(); conn.close()
     conn=get_db(); cur=conn.cursor()
-    cur.execute("SELECT * FROM players ORDER BY id")
-    players = cur.fetchall(); cur.close(); conn.close()
+    cur.execute("SELECT * FROM players ORDER BY id"); players = cur.fetchall(); cur.close(); conn.close()
     monsters = get_monsters()
     loc_options = "".join([f'<option value="{k}">{v["name"]}</option>' for k,v in LOCATIONS.items()])
     players_html = ""
     for p in players:
-        pid = p["id"] if isinstance(p,dict) else p[0]
-        nm = p["name"] if isinstance(p,dict) else p[1]
-        lg = p["login"] if isinstance(p,dict) else p[2]
-        gold = p["gold"] if isinstance(p,dict) else p[4]
-        silver = p["silver"] if isinstance(p,dict) else p[5]
-        rubin = p["rubin"] if isinstance(p,dict) else p[6]
-        exp = p["exp"] if isinstance(p,dict) else p[7]
-        lvl = p["level"] if isinstance(p,dict) else p[8]
-        hp = p["hp"] if isinstance(p,dict) else p[9]
-        wins = p["wins"] if isinstance(p,dict) else p[10]
-        players_html += f'''
-        <form method="post" style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:12px;margin:10px 0">
-          <b>{nm} (@{lg}) — ID {pid}</b><br>
-          <input type="hidden" name="action" value="edit_player">
-          <input type="hidden" name="pid" value="{pid}">
-          Уровень (1-21): <input name="level" type="number" value="{lvl}" min="1" max="21">
-          Опыт: <input name="exp" type="number" value="{exp}">
-          Золото 🪙: <input name="gold" type="number" value="{gold}">
-          Серебро ⚪: <input name="silver" type="number" value="{silver}">
-          Рубины 💎: <input name="rubin" type="number" value="{rubin}">
-          HP ❤️: <input name="hp" type="number" value="{hp}">
-          Побед 🏆: <input name="wins" type="number" value="{wins}">
-          <button class="btn-orange" style="margin:5px auto">💾 Сохранить игрока</button>
-        </form>'''
+        pid = p["id"] if isinstance(p,dict) else p[0]; nm = p["name"] if isinstance(p,dict) else p[1]; lg = p["login"] if isinstance(p,dict) else p[2]; gold = p["gold"] if isinstance(p,dict) else p[4]; silver = p["silver"] if isinstance(p,dict) else p[5]; rubin = p["rubin"] if isinstance(p,dict) else p[6]; exp = p["exp"] if isinstance(p,dict) else p[7]; lvl = p["level"] if isinstance(p,dict) else p[8]; hp = p["hp"] if isinstance(p,dict) else p[9]; wins = p["wins"] if isinstance(p,dict) else p[10]
+        players_html += f'''<form method="post" style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:12px;margin:10px 0"><b>{nm} (@{lg}) — ID {pid}</b><br><input type="hidden" name="action" value="edit_player"><input type="hidden" name="pid" value="{pid}">Уровень (1-21): <input name="level" type="number" value="{lvl}" min="1" max="21">Опыт: <input name="exp" type="number" value="{exp}">Золото 🪙: <input name="gold" type="number" value="{gold}">Серебро ⚪: <input name="silver" type="number" value="{silver}">Рубины 💎: <input name="rubin" type="number" value="{rubin}">HP ❤️: <input name="hp" type="number" value="{hp}">Побед 🏆: <input name="wins" type="number" value="{wins}"><button class="btn-orange" style="margin:5px auto">💾 Сохранить игрока</button></form>'''
     monsters_html = ""
     for key,m in monsters.items():
         loc_sel = "".join([f'<option value="{k}" {"selected" if m.get("location","promysel")==k else ""}>{v["name"]}</option>' for k,v in LOCATIONS.items()])
-        monsters_html += f'''
-        <form method="post" style="background:#fff3cd;border:2px solid #c9a45c;border-radius:10px;padding:12px;margin:10px 0">
-          <b>👹 {m["name"]} ({key}) — 📍 {LOCATIONS.get(m.get("location","promysel"),dict()).get("name","?")}</b><br>
-          <input type="hidden" name="action" value="edit_monster">
-          <input type="hidden" name="mkey" value="{key}">
-          HP монстра: <input name="m_hp" type="number" value="{m["hp"]}">
-          Награда Золото 🪙: <input name="m_gold" type="number" value="{m["gold"]}">
-          Награда Серебро ⚪: <input name="m_silver" type="number" value="{m["silver"]}">
-          Награда Рубины 💎: <input name="m_rubin" type="number" value="{m["rubin"]}">
-          Урон мин: <input name="m_dmg_min" type="number" value="{m["dmg"][0]}">
-          Урон макс: <input name="m_dmg_max" type="number" value="{m["dmg"][1]}">
-          <button class="btn-orange" style="margin:5px auto">💾 Сохранить монстра</button>
-        </form>
-        <form method="post" style="background:#e8f5ff;border:2px solid #4a7ba6;border-radius:10px;padding:10px;margin:-5px 0 10px">
-          <input type="hidden" name="action" value="move_monster">
-          <input type="hidden" name="mkey" value="{key}">
-          Переместить в: <select name="new_location">{loc_sel}</select>
-          <button class="btn-orange" style="margin:5px auto">📍 Переместить</button>
-        </form>
-        <form method="post" onsubmit="return confirm('Удалить монстра?')" style="margin:-5px 0 10px">
-          <input type="hidden" name="action" value="delete_monster">
-          <input type="hidden" name="mkey" value="{key}">
-          <button style="width:100%;padding:8px;background:#c92a2a;color:#fff;border:0;border-radius:8px;font-weight:bold">🗑️ Удалить монстра</button>
-        </form>'''
+        monsters_html += f'''<form method="post" style="background:#fff3cd;border:2px solid #c9a45c;border-radius:10px;padding:12px;margin:10px 0"><b>👹 {m["name"]} ({key}) — 📍 {LOCATIONS.get(m.get("location","promysel"),dict()).get("name","?")}</b><br><input type="hidden" name="action" value="edit_monster"><input type="hidden" name="mkey" value="{key}">HP монстра: <input name="m_hp" type="number" value="{m["hp"]}">Награда Золото 🪙: <input name="m_gold" type="number" value="{m["gold"]}">Награда Серебро ⚪: <input name="m_silver" type="number" value="{m["silver"]}">Награда Рубины 💎: <input name="m_rubin" type="number" value="{m["rubin"]}">Урон мин: <input name="m_dmg_min" type="number" value="{m["dmg"][0]}">Урон макс: <input name="m_dmg_max" type="number" value="{m["dmg"][1]}"><button class="btn-orange" style="margin:5px auto">💾 Сохранить монстра</button></form>
+        <form method="post" style="background:#e8f5ff;border:2px solid #4a7ba6;border-radius:10px;padding:10px;margin:-5px 0 10px"><input type="hidden" name="action" value="move_monster"><input type="hidden" name="mkey" value="{key}">Переместить в: <select name="new_location">{loc_sel}</select><button class="btn-orange" style="margin:5px auto">📍 Переместить</button></form>
+        <form method="post" onsubmit="return confirm('Удалить монстра?')" style="margin:-5px 0 10px"><input type="hidden" name="action" value="delete_monster"><input type="hidden" name="mkey" value="{key}"><button style="width:100%;padding:8px;background:#c92a2a;color:#fff;border:0;border-radius:8px;font-weight:bold">🗑️ Удалить монстра</button></form>'''
     html = f'''
     <div class="wrap" style="padding:15px">
       <h2 style="text-align:center">👑 АДМИН ПАНЕЛЬ</h2>
       <p style="text-align:center;color:green;font-weight:bold">{msg}</p>
+      <a href="/admin/items" style="display:block;background:#111;color:#ffd700;text-align:center;padding:14px;text-decoration:none;font-weight:900;border-radius:10px;border:2px solid #ffd700;margin-bottom:12px">🛒 АДМИН: ВЕЩИ / ВЫДАЧА →</a>
       <h3>🎁 Быстрая выдача + УРОВНИ</h3>
       <form method="post" style="background:#e8ffd6;border:2px solid green;border-radius:10px;padding:12px">
-        <input type="hidden" name="action" value="give">
-        Логин игрока: <input name="target_login" placeholder="например: warrior123" required>
-        + Золото 🪙: <input name="add_gold" type="number" value="0">
-        + Серебро ⚪: <input name="add_silver" type="number" value="0">
-        + Рубины 💎: <input name="add_rubin" type="number" value="0">
-        + Опыт XP: <input name="add_exp" type="number" value="0">
-        <div style="background:#fff3cd;border:2px solid #c9a45c;border-radius:8px;padding:10px;margin:8px 0">
-          <b>⭐ ВЫДАЧА УРОВНЕЙ:</b><br>
-          + Добавить уровней: <input name="add_level" type="number" value="0" placeholder="например: +3">
-          Поставить точный уровень (1-21): <input name="set_level" type="number" value="0" min="0" max="21" placeholder="0 = не менять">
-        </div>
+        <input type="hidden" name="action" value="give">Логин игрока: <input name="target_login" placeholder="например: warrior123" required>
+        + Золото 🪙: <input name="add_gold" type="number" value="0">+ Серебро ⚪: <input name="add_silver" type="number" value="0">+ Рубины 💎: <input name="add_rubin" type="number" value="0">+ Опыт XP: <input name="add_exp" type="number" value="0">
+        <div style="background:#fff3cd;border:2px solid #c9a45c;border-radius:8px;padding:10px;margin:8px 0"><b>⭐ ВЫДАЧА УРОВНЕЙ:</b><br>+ Добавить уровней: <input name="add_level" type="number" value="0" placeholder="например: +3">Поставить точный уровень (1-21): <input name="set_level" type="number" value="0" min="0" max="21" placeholder="0 = не менять"></div>
         <button class="btn-orange">🎁 ВЫДАТЬ</button>
       </form>
       <h3>👹 Добавить монстра в локацию</h3>
       <form method="post" style="background:#fff3cd;border:2px solid #c9a45c;border-radius:10px;padding:12px">
-        <input type="hidden" name="action" value="add_monster">
-        Ключ (англ, без пробелов): <input name="m_key" placeholder="naprimer: volk" required>
-        Имя: <input name="m_name" placeholder="Волк" required>
-        Картинка: <input name="m_img" value="ancient_warrior.png">
-        HP: <input name="m_hp" type="number" value="50">
-        Урон мин: <input name="m_dmg_min" type="number" value="2">
-        Урон макс: <input name="m_dmg_max" type="number" value="5">
-        Золото: <input name="m_gold" type="number" value="2">
-        Серебро: <input name="m_silver" type="number" value="10">
-        Рубины: <input name="m_rubin" type="number" value="0">
-        Локация: <select name="m_location">{loc_options}</select>
-        <button class="btn-orange">➕ СОЗДАТЬ МОНСТРА</button>
+        <input type="hidden" name="action" value="add_monster">Ключ (англ, без пробелов): <input name="m_key" placeholder="naprimer: volk" required>Имя: <input name="m_name" placeholder="Волк" required>Картинка: <input name="m_img" value="ancient_warrior.png">HP: <input name="m_hp" type="number" value="50">Урон мин: <input name="m_dmg_min" type="number" value="2">Урон макс: <input name="m_dmg_max" type="number" value="5">Золото: <input name="m_gold" type="number" value="2">Серебро: <input name="m_silver" type="number" value="10">Рубины: <input name="m_rubin" type="number" value="0">Локация: <select name="m_location">{loc_options}</select><button class="btn-orange">➕ СОЗДАТЬ МОНСТРА</button>
       </form>
-      <h3>👹 Монстры по локациям</h3>
-      {monsters_html}
-      <h3>👥 Все игроки</h3>
-      {players_html}
+      <h3>👹 Монстры по локациям</h3>{monsters_html}
+      <h3>👥 Все игроки</h3>{players_html}
       <a href="/game" class="btn-orange">← На главную</a>
     </div>'''
     return render_page(html, False)
