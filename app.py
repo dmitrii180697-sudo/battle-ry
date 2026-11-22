@@ -651,8 +651,9 @@ def api_chat():
 def shop():
     if "uid" not in session: return redirect("/")
     p = get_player(session["uid"]); l, h, r, g, s = vals(p)
+    cur_loc = session.get("current_loc", "lager")
+    cur_loc_name = LOCATIONS.get(cur_loc, {}).get("name", "Лагерь")
     html = f'''
-    cur_loc_name = LOCATIONS.get(session.get("current_loc","lager"), {}).get("name","Лагерь")
     <style>
     .shop-wrap{{max-width:480px;margin:0 auto;min-height:100dvh;background:linear-gradient(180deg,#0a1e35 0%,#122c4d 40%,#1a0e0a 100%);padding:12px;box-sizing:border-box}}
     .shop-top{{background:rgba(8,30,55,.92);border:2px solid #4a7ba6;border-radius:10px;padding:10px;text-align:center;color:#fff;font-weight:900;font-size:20px}}
