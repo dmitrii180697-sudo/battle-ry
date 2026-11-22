@@ -873,18 +873,24 @@ def hero():
     wins = int(p.get("wins",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     losses = int(p.get("losses",0)) if isinstance(p,dict) or hasattr(p,'get') else 0
     admin_tag = " 👑 ADMIN" if is_admin() else ""
-    hp = l*10; st = l; exp_need = l*100
+    hp = l*10 + bonus.get("hp",0); exp_need = l*100
+    dmg = l + bonus.get("damage",0)
+    armor = l + bonus.get("armor",0)
+    dodge = l + bonus.get("dodge",0)
+    acc = l + bonus.get("accuracy",0) + bonus.get("acc",0)
+    block = l + bonus.get("block",0)
+    stun = bonus.get("stun",0)
     return render_page(f'''<div class="wrap" style="padding:15px">
     <h2 style="text-align:center">🧝 Герой {nick}{admin_tag}</h2>
     <p style="text-align:center">Уровень {l} / 21 | Опыт {exp} / {exp_need} | Победы {wins} / Поражения {losses}</p>
     <div style="background:#e8d5a3;color:#000;padding:15px;border-radius:10px;font-size:18px;line-height:2">
-      <div style="display:flex;justify-content:space-between"><span>Жизнь:</span><span>❤️ {hp}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Урон:</span><span>🗡️ {st}...{st}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Точность:</span><span>🎯 {st}...{st}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Броня:</span><span>🛡️ {st}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Уворот:</span><span>💨 {st}...{st}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Оглушение:</span><span>🥢 {st}...{st}</span></div>
-      <div style="display:flex;justify-content:space-between"><span>Блок:</span><span>🔰 {st}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>❤️ Жизнь:</span><span>❤️ {hp}</span></div>
+<div style="display:flex;justify-content:space-between"><span>🗡️ Урон:</span><span>⚔️ {dmg} (+{bonus.get("damage",0)})</span></div>
+<div style="display:flex;justify-content:space-between"><span>🎯 Точность:</span><span>🎯 {acc}</span></div>
+<div style="display:flex;justify-content:space-between"><span>🛡️ Броня:</span><span>🛡️ {armor} (+{bonus.get("armor",0)})</span></div>
+<div style="display:flex;justify-content:space-between"><span>💨 Уворот:</span><span>💨 {dodge} (+{bonus.get("dodge",0)})</span></div>
+<div style="display:flex;justify-content:space-between"><span>💥 Оглушение:</span><span>💥 {stun}</span></div>
+<div style="display:flex;justify-content:space-between"><span>🛡️ Блок:</span><span>🛡️ {block}</span></div>
     </div>
     <p style="text-align:center;color:#aaa;font-size:13px">Слава и Звания — скоро</p>
     <br><div style="text-align:center"><a href="/game"><button>⬅ Назад</button></a></div>
