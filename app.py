@@ -316,7 +316,7 @@ def add_loss(uid):
         conn.commit(); cur.close(); conn.close()
         clear_fight_db(uid)
     except: pass
-    BASE_CSS = """
+BASE_CSS = """
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <style>
 *{box-sizing:border-box}
