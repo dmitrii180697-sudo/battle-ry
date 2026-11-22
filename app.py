@@ -646,7 +646,7 @@ def api_chat():
         return jsonify({"ok":True})
     except Exception as e: return jsonify({"ok":False,"msg":str(e)})
 
-# ===== МАГАЗИН ИЗ data/shop.json =====
+# ===== МАГАЗИН ИЗ data/shop.json - НОВЫЙ =====
 @app.route("/shop")
 def shop():
     if "uid" not in session: return redirect("/")
@@ -667,7 +667,7 @@ def shop():
     .c-char{{background:linear-gradient(180deg,#4a2a0a,#c98a2a);border-color:#ffcc00}}
     </style>
     <div class="shop-wrap">
-      <div class="shop-top">🛒 МАГАЗИН</div>
+      <div class="shop-top">🛒 МАГАЗИН — {LOCATIONS.get(session.get("current_loc","lager"),{{}}).get("name","Лагерь")}</div>
       <div class="shop-balance"><span>💎 {r}</span><span>🪙 {g}</span><span>⚪ {s}</span></div>
       <a href="/shop/weapon" class="shop-btn c-weapon">🗡️ Оружие</a>
       <a href="/shop/armor" class="shop-btn c-armor">🛡️ Броня</a>
@@ -686,21 +686,68 @@ def shop_cat(cat):
     if "uid" not in session: return redirect("/")
     names={"weapon":"🗡️ Оружие","armor":"🛡️ Броня","potion":"🧪 Зелья и Свитки","amulet":"🔮 Амулеты","misc":"📦 Разное","auction":"🏆 Аукцион","sell":"💰 Продать","chars":"🧝 Персонажи"}
     title=names.get(cat,"Магазин")
+    sort = request.args.get("sort","none")
+    cur_loc = session.get("current_loc","lager")
     shop_data = load_json("shop")
     items = shop_data.get(cat, [])
+
+    # 1. ФИЛЬТР ПО ЛОКАЦИИ - в каждой локации свой товар
+    filtered = []
+    for it in items:
+        loc = it.get("location")
+        if loc and loc != cur_loc:
+            continue
+        filtered.append(it)
+    items = filtered
+
+    # 2. СОРТИРОВКА
+    if sort == "damage":
+        items = sorted(items, key=lambda x: -int(x.get("damage",0)))
+    elif sort == "armor":
+        items = sorted(items, key=lambda x: -int(x.get("armor",0)))
+    elif sort == "dodge":
+        items = sorted(items, key=lambda x: -int(x.get("dodge",0)))
+    elif sort == "price":
+        items = sorted(items, key=lambda x: int(x.get("gold",0))*100 + int(x.get("silver",0)))
+
     if not items:
-        cards = '<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">Тут пока пусто! Добавь товар в data/shop.json → раздел "' + cat + '"</div>'
+        cards = '<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">В этой локации пока нет товаров этой категории.<br>Сходи в другую локацию или добавь товар в shop.json с location = '+cur_loc+'</div>'
     else:
-        cards = ""
+        cards = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
         for it in items:
             price = ""
             if it.get("gold"): price += f'{it["gold"]}🪙 '
             if it.get("silver"): price += f'{it["silver"]}⚪ '
             if it.get("rubin"): price += f'{it["rubin"]}💎 '
-            cards += f'<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;margin:10px 0;text-align:left"><b>{it.get("name","Товар")}</b><br><small>{it.get("desc","")}</small><br><b>Цена: {price or "Бесплатно"}</b><br><form method="post" action="/shop/buy/{cat}/{it.get("id","")}"><button class="btn-orange" style="margin:8px auto 0">Купить</button></form></div>'
+            stats = ""
+            if it.get("damage"): stats += f'⚔️{it["damage"]} '
+            if it.get("armor"): stats += f'🛡️{it["armor"]} '
+            if it.get("dodge"): stats += f'💨{it["dodge"]} '
+            lvl = it.get("level",1)
+            icon = it.get("icon","📦")
+            cards += f'''
+            <div style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid #5a3e22;border-radius:10px;padding:8px;text-align:center;position:relative;color:#3d2817">
+                <div style="position:absolute;top:4px;left:6px;font-size:12px">⭐{lvl}</div>
+                <div style="font-size:38px;margin:14px 0 4px">{icon}</div>
+                <div style="font-size:12px;font-weight:bold;min-height:28px">{it.get("name","Товар")}</div>
+                <div style="font-size:11px;color:#5a3e22;min-height:16px">{stats if stats else it.get("desc","")}</div>
+                <div style="font-weight:bold;margin:4px 0;font-size:12px">{price or "Бесплатно"}</div>
+                <form method="post" action="/shop/buy/{cat}/{it.get("id","")}"><button style="width:100%;background:#ff9c00;color:#fff;padding:6px;border:0;border-radius:6px;font-weight:bold">Купить</button></form>
+            </div>'''
+        cards += '</div>'
+
+    sorts_html = f'''
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
+      <a href="/shop/{cat}?sort=none" style="padding:7px 10px;background:{'#ff9c00' if sort=='none' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">Нет</a>
+      <a href="/shop/{cat}?sort=damage" style="padding:7px 10px;background:{'#ff9c00' if sort=='damage' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">⚔️ Урон</a>
+      <a href="/shop/{cat}?sort=dodge" style="padding:7px 10px;background:{'#ff9c00' if sort=='dodge' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">💨 Уворот</a>
+      <a href="/shop/{cat}?sort=armor" style="padding:7px 10px;background:{'#ff9c00' if sort=='armor' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">🛡️ Броня</a>
+      <a href="/shop/{cat}?sort=price" style="padding:7px 10px;background:{'#ff9c00' if sort=='price' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">🪙 Цена</a>
+    </div>'''
     msg = request.args.get("msg","")
     msg_html = f'<p style="color:green;font-weight:bold">{msg}</p>' if msg else ""
-    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>{title}</h2>{msg_html}{cards}<a href="/shop" class="btn-orange">← К магазину</a></div>', True)
+    loc_name = LOCATIONS.get(cur_loc,{}).get("name",cur_loc)
+    return render_page(f'<div class="wrap" style="padding:15px;text-align:center"><h2>{title}</h2><p style="font-size:13px;color:#666">📍 {loc_name} — только товар этой локации</p>{msg_html}{sorts_html}{cards}<a href="/shop" class="btn-orange">← К магазину</a></div>', True)
 
 @app.route("/shop/buy/<cat>/<item_id>", methods=["POST"])
 def shop_buy(cat, item_id):
@@ -709,6 +756,10 @@ def shop_buy(cat, item_id):
     items = shop_data.get(cat, [])
     item = next((x for x in items if str(x.get("id")) == str(item_id)), None)
     if not item: return redirect(f"/shop/{cat}?msg=Товар не найден")
+    # Проверка локации - нельзя купить чужой товар через прямую ссылку
+    cur_loc = session.get("current_loc","lager")
+    if item.get("location") and item.get("location") != cur_loc:
+        return redirect(f"/shop/{cat}?msg=Этот товар не продается в этой локации!")
     p = get_player(session["uid"]); l, h, r, g, s = vals(p)
     need_g = int(item.get("gold") or 0); need_s = int(item.get("silver") or 0); need_r = int(item.get("rubin") or 0)
     if g < need_g or s < need_s or r < need_r:

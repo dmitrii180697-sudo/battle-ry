@@ -1,14 +1,20 @@
 {
   "weapon": [
-    {"id": "sword_1", "name": "🗡️ Ржавый меч", "desc": "Слабый, но лучше чем кулаки", "gold": 5, "silver": 0, "rubin": 0},
-    {"id": "sword_2", "name": "⚔️ Стальной меч", "desc": "Крепкий меч воина", "gold": 20, "silver": 0, "rubin": 0},
-    {"id": "axe_1", "name": "🪓 Боевой топор", "desc": "Тяжёлый и страшный", "gold": 0, "silver": 0, "rubin": 2}
+    {"id": "sword_1", "name": "⚔️ Ржавый меч", "desc": "Слабый, но лучше чем кулаки", "gold": 5, "silver": 0, "rubin": 0, "level": 1, "location": "lager", "damage": 3, "dodge": 0, "armor": 0, "icon": "🗡️"},
+    {"id": "sword_2", "name": "⚔️ Стальной меч", "desc": "Крепкий меч воина", "gold": 20, "silver": 0, "rubin": 0, "level": 2, "location": "lager", "damage": 6, "dodge": 0, "armor": 0, "icon": "⚔️"},
+    {"id": "axe_1", "name": "🪓 Боевой топор", "desc": "Тяжелый и страшный", "gold": 0, "silver": 0, "rubin": 2, "level": 3, "location": "zastava", "damage": 9, "dodge": 1, "armor": 0, "icon": "🪓"},
+    {"id": "dubina_1", "name": "🪵 Крепкая дубина", "desc": "Простая, но бьет больно", "gold": 13, "silver": 0, "rubin": 0, "level": 1, "location": "lager", "damage": 4, "dodge": 0, "armor": 0, "icon": "🪵"},
+    {"id": "sekira_1", "name": "🪓 Секира", "desc": "Для настоящих воинов", "gold": 23, "silver": 0, "rubin": 0, "level": 2, "location": "zastava", "damage": 7, "dodge": 2, "armor": 0, "icon": "🪓"},
+    {"id": "sabla_1", "name": "🗡️ Сабля", "desc": "Быстрая и острая", "gold": 21, "silver": 0, "rubin": 0, "level": 4, "location": "les", "damage": 10, "dodge": 4, "armor": 0, "icon": "🗡️"},
+    {"id": "bulava_1", "name": "🔨 Железная булава", "desc": "Крушит все", "gold": 94, "silver": 0, "rubin": 0, "level": 5, "location": "oboz", "damage": 15, "dodge": 0, "armor": 0, "icon": "🔨"}
   ],
   "armor": [
-    {"id": "armor_1", "name": "🛡️ Кожаная броня", "desc": "+1 к защите", "gold": 10, "silver": 0, "rubin": 0}
+    {"id": "armor_1", "name": "🧥 Кожаная броня", "desc": "+1 к защите", "gold": 10, "silver": 0, "rubin": 0, "level": 1, "location": "lager", "damage": 0, "dodge": 1, "armor": 3, "icon": "🧥"},
+    {"id": "armor_2", "name": "🛡️ Крепкий щит", "desc": "Держит удар", "gold": 6, "silver": 0, "rubin": 0, "level": 2, "location": "zastava", "damage": 0, "dodge": 0, "armor": 5, "icon": "🛡️"},
+    {"id": "armor_3", "name": "🦺 Кольчужка", "desc": "Надежная защита", "gold": 6, "silver": 0, "rubin": 0, "level": 3, "location": "zastava", "damage": 0, "dodge": 0, "armor": 6, "icon": "🦺"}
   ],
   "potion": [
-    {"id": "potion_1", "name": "🧪 Зелье жизни", "desc": "Восстанавливает HP", "gold": 3, "silver": 0, "rubin": 0}
+    {"id": "potion_1", "name": "🧪 Зелье жизни", "desc": "Восстанавливает HP", "gold": 3, "silver": 0, "rubin": 0, "level": 1, "location": "lager", "damage": 0, "dodge": 0, "armor": 0, "icon": "🧪"}
   ],
   "amulet": [],
   "misc": [],
