@@ -259,7 +259,7 @@ def get_slot(it):
 
 def total_stats(p):
     eq = get_eq(p)
-    bonus = {"damage":0, "armor":0, "dodge":0}
+    bonus = {"damage":0, "accuracy":0, "armor":0, "dodge":0, "block":0, "hp":0, "stun":0}
     for slot, item_id in eq.items():
         it = find_item_by_id(item_id)
         if it:
