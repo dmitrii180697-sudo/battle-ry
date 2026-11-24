@@ -359,6 +359,10 @@ input,select{width:100%;padding:10px;margin:5px 0;border:2px solid #8a6a3d;borde
 .item-modal-row b{color:#ffe27a}
 .buy-btn{display:block;width:100%;margin-top:14px;padding:12px;background:linear-gradient(#3fae3a,#1e7a1e);color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:800;cursor:pointer}
 .close-btn{float:right;background:none;border:none;color:#fff;font-size:22px;cursor:pointer}
+.shop-list,.sheet-grid{background:linear-gradient(180deg,#1e3a2a,#12261a) !important;border:3px solid #d4af37 !important;border-radius:14px !important;padding:12px !important}
+.shop-card,.sheet-item{background:linear-gradient(180deg,#fdf6c8,#f3dfa8) !important;border:2px solid #b08d3e !important}
+body{background:#0f2118 !important}
+.wrap{background:#12261a !important}
 </style>
 <script>
 function toggleMenu(){document.getElementById('sheetOverlay').style.display='block';setTimeout(()=>document.getElementById('bottomSheet').classList.add('open'),10);}
