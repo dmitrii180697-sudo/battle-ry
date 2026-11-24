@@ -1,7 +1,15 @@
 import os, random, json, time, re
+# pyright: reportMissingImports=false
 from flask import Flask, request, send_from_directory, session, redirect, jsonify, render_template_string, render_template
-import psycopg2
-from psycopg2.extras import RealDictCursor
+
+# PostgreSQL optional: SQLite is used automatically if DATABASE_URL is not set.
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+except ImportError:
+    psycopg2 = None
+    RealDictCursor = None
+
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -344,7 +352,7 @@ MENU_HTML = """
 <div class="bottom-sheet" id="bottomSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-grid">
-    <a href="/shop" class="sheet-item">🛒 Магазин</a>
+shop    <a href="/" class="sheet-item">🛒 Магазин</a>
     <a href="/bank" class="sheet-item">🏦 Банк</a>
     <a href="/clan" class="sheet-item">🛡️ Клан</a>
     <a href="/alliance" class="sheet-item">🤝 Альянс</a>
@@ -356,9 +364,40 @@ MENU_HTML = """
   <button onclick="closeMenu()" style="width:100%;margin-top:12px;padding:10px;background:#5a3e22;color:#e8d6a8;border:0;border-radius:8px;font-weight:bold">Закрыть</button>
 </div>
 """
+# === МОДАЛКА ПРЕДМЕТА - вставить ПЕРЕД _page(...) ===
+item_modal = """
+<div id="itemModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center;" onclick="if(event.target==this) closeItemModal()">
+  <div style="background:#1a1a1a; border:2px solid #c9a227; border-radius:12px; width:95%; max-width:420px; color:#fff;">
+    <div style="background:#2a2a2a; padding:12px 14px; display:flex; justify-content:space-between;">
+      <b id="m_name"></b><span onclick="closeItemModal()" style="cursor:pointer;">✖</span>
+    </div>
+    <div style="padding:14px;">
+      <div style="display:flex; gap:12px;">
+        <div id="m_icon" style="font-size:64px; background:#000; border:1px solid #555; border-radius:8px; width:90px; height:90px; display:flex; align-items:center; justify-content:center;"></div>
+        <div style="flex:1;">
+          <div id="m_style" style="color:#ffcc00; font-size:13px;"></div>
+          <div id="m_desc" style="font-size:13px; color:#ddd;"></div>
+          <div id="m_price" style="margin-top:8px; font-weight:bold; color:#4da6ff;"></div>
+          <div id="m_qty" style="font-size:12px; color:#aaa;"></div>
+        </div>
+      </div>
+      <table style="width:100%; margin-top:14px; font-size:14px; border-collapse:collapse;">
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Точность</td><td id="m_accuracy" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Урон</td><td id="m_damage" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Блок</td><td id="m_block" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Оглушение</td><td id="m_stun" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Уворот</td><td id="m_dodge" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px; border-bottom:1px solid #333;">Броня</td><td id="m_armor" style="text-align:right;"></td></tr>
+        <tr><td style="padding:6px;">Здоровье</td><td id="m_health" style="text-align:right;"></td></tr>
+      </table>
+      <button onclick="buyCurrentItem()" style="width:100%; margin-top:14px; padding:12px; background:#c9a227; border:none; border-radius:8px; font-weight:bold;">Купить</button>
+    </div>
+  </div>
+</div>
+"""
 def render_page(inner_html, show_menu=True):
     menu = MENU_HTML if show_menu else ""
-    return render_template_string(BASE_CSS + inner_html + menu)
+    return render_template_string(BASE_CSS + inner_html + menu + item_modal)
 
 @app.route("/static/<path:filename>")
 def static_files(filename):
@@ -752,8 +791,9 @@ def shop_cat(cat):
             if it.get("armor"): stats += f'🛡️{it["armor"]} '
             if it.get("dodge"): stats += f'💨{it["dodge"]} '
             lvl = it.get("level",1); icon = it.get("icon","📦")
+            import json as _json; item_json = _json.dumps(it, ensure_ascii=False).replace('"','&quot;')
             cards += f'''
-            <div style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid #5a3e22;border-radius:10px;padding:8px;text-align:center;position:relative;color:#3d2817">
+            <div data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))" style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid #5a3e22;border-radius:10px;padding:8px;text-align:center;position:relative;color:#3d2817">
                 <div style="position:absolute;top:4px;left:6px;font-size:12px">⭐{lvl}</div>
                 <div style="font-size:38px;margin:14px 0 4px">{icon}</div>
                 <div style="font-size:12px;font-weight:bold;min-height:28px">{it.get("name","Товар")}</div>
