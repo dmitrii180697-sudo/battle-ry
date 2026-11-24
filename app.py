@@ -341,6 +341,24 @@ input,select{width:100%;padding:10px;margin:5px 0;border:2px solid #8a6a3d;borde
 .sheet-handle{width:44px;height:5px;background:#8a6a3d;border-radius:3px;margin:0 auto 12px}
 .sheet-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sheet-item{background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:14px;text-align:center;color:#3d2817;text-decoration:none;font-weight:bold}
+.shop-list{display:flex;flex-direction:column;gap:10px;padding:10px}
+.shop-card{display:flex;align-items:center;gap:10px;background:linear-gradient(#f3dfa8,#e8c97e);border:2px solid #8a5a1e;border-radius:12px;padding:10px;cursor:pointer;box-shadow:0 3px 0 #5a3a0e}
+.shop-icon{width:64px;height:64px;flex-shrink:0;background:radial-gradient(circle,#a4e07a,#3a8a2a);border:2px solid #1e4d12;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:38px}
+.shop-info{flex:1;min-width:0}
+.shop-name{font-weight:800;color:#3a2400;font-size:17px}
+.shop-lvl{font-size:13px;color:#5a3a0e}
+.shop-stats{font-size:13px;color:#333;margin-top:3px}
+.shop-price{background:#1e7ae0;color:#fff;font-weight:800;padding:6px 12px;border-radius:20px;white-space:nowrap}
+.item-modal-bg{display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px}
+.item-modal-bg.open{display:flex}
+.item-modal{width:100%;max-width:380px;max-height:90vh;overflow:auto;background:linear-gradient(#1e4d1e,#0f2f0f);border:3px solid #d4af37;border-radius:14px;color:#fff;padding:16px}
+.item-modal h2{text-align:center;color:#ffe27a;margin:0 0 10px;font-size:20px}
+.item-modal-top{display:flex;gap:12px}
+.item-modal-desc{font-size:14px;line-height:1.4;color:#e8ffd0}
+.item-modal-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:15px}
+.item-modal-row b{color:#ffe27a}
+.buy-btn{display:block;width:100%;margin-top:14px;padding:12px;background:linear-gradient(#3fae3a,#1e7a1e);color:#fff;border:none;border-radius:10px;font-size:18px;font-weight:800;cursor:pointer}
+.close-btn{float:right;background:none;border:none;color:#fff;font-size:22px;cursor:pointer}
 </style>
 <script>
 function toggleMenu(){document.getElementById('sheetOverlay').style.display='block';setTimeout(()=>document.getElementById('bottomSheet').classList.add('open'),10);}
@@ -780,7 +798,7 @@ def shop_cat(cat):
     if not items:
         cards = '<div style="background:#fdf6c8;border:2px solid #8a6a3d;border-radius:10px;padding:20px">В этой локации пока нет товаров этой категории.<br>Сходи в другую локацию или добавь товар в shop.json с location = '+cur_loc+'</div>'
     else:
-        cards = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+        cards = '<div class="shop-list">'
         for it in items:
             price = ""
             if it.get("gold"): price += f'{it["gold"]}🪙 '
@@ -793,15 +811,16 @@ def shop_cat(cat):
             lvl = it.get("level",1); icon = it.get("icon","📦")
             import json as _json; item_json = _json.dumps(it, ensure_ascii=False).replace('"','&quot;')
             cards += f'''
-            <div data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))" style="background:linear-gradient(#e8d6a8,#d9be85);border:2px solid #5a3e22;border-radius:10px;padding:8px;text-align:center;position:relative;color:#3d2817">
-                <div style="position:absolute;top:4px;left:6px;font-size:12px">⭐{lvl}</div>
-                <div style="font-size:38px;margin:14px 0 4px">{icon}</div>
-                <div style="font-size:12px;font-weight:bold;min-height:28px">{it.get("name","Товар")}</div>
-                <div style="font-size:11px;color:#5a3e22;min-height:16px">{stats if stats else it.get("desc","")}</div>
-                <div style="font-weight:bold;margin:4px 0;font-size:12px">{price or "Бесплатно"}</div>
-                <form method="post" action="/shop/buy/{cat}/{it.get("id","")}"><button style="width:100%;background:#ff9c00;color:#fff;padding:6px;border:0;border-radius:6px;font-weight:bold">Купить</button></form>
-            </div>'''
-        cards += '</div>'
+            <div class="shop-card" data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))">
+  <div class="shop-icon">{icon}</div>
+  <div class="shop-info">
+    <div class="shop-name">{it.get("name","Товар")}</div>
+    <div class="shop-lvl">⭐ {lvl}</div>
+    <div class="shop-stats">{stats if stats else it.get("desc","")}</div>
+  </div>
+  <div class="shop-price">{price or "Бесплатно"}</div>
+</div>
+'''
     sorts_html = f'''
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
       <a href="/shop/{cat}?sort=none" style="padding:7px 10px;background:{'#ff9c00' if sort=='none' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">Нет</a>
