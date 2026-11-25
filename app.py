@@ -822,9 +822,10 @@ def shop_cat(cat):
             if block: stats += f" 🛡️{block}"
             if dodge: stats += f" 💨{dodge}"
             if armor: stats += f" 🛡️{armor}"
+            icon_html = f'<img src="/static/{it["image"]}" style="width:52px;height:52px;object-fit:cover;border-radius:8px">' if it.get("image") else it.get("icon","🗡️")
             cards += f'''
                 <div class="shop-card" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))" data-item="{item_json}">
-                  <div class="shop-icon">{it.get("icon","🗡️")}</div>
+                  <div class="shop-icon">{icon_html}</div>
                   <div class="shop-main">
                     <div class="shop-top"><span class="shop-name">{it.get("name","товар")}</span><span class="shop-lvl">⭐ {it.get("level","?")}</span></div>
                     <div class="shop-weight">{weight}</div>
