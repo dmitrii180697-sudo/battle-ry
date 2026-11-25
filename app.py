@@ -808,23 +808,18 @@ def shop_cat(cat):
             if it.get("gold"): price += f'{it["gold"]}🪙 '
             if it.get("silver"): price += f'{it["silver"]}⚪ '
             if it.get("rubin"): price += f'{it["rubin"]}💎 '
-            stats = ""
-            if it.get("damage"): stats += f'⚔️{it["damage"]} '
-            if it.get("armor"): stats += f'🛡️{it["armor"]} '
-            if it.get("dodge"): stats += f'💨{it["dodge"]} '
-            lvl = it.get("level",1); icon = it.get("icon","📦")
             import json as _json; item_json = _json.dumps(it, ensure_ascii=False).replace('"','&quot;')
-            cards += f'''
-            <div class="shop-card" data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))">
-  <div class="shop-icon">{icon}</div>
-  <div class="shop-info">
-    <div class="shop-name">{it.get("name","Товар")}</div>
-    <div class="shop-lvl">⭐ {lvl}</div>
-    <div class="shop-stats">{stats if stats else it.get("desc","")}</div>
-  </div>
-  <div class="shop-price">{price or "Бесплатно"}</div>
-</div>
-'''
+        cards = f'''
+        <div class="shop-card" data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))">
+        <div class="shop-icon">{it.get("icon","🗡️")}</div>
+        <div class="shop-info">
+        <div class="shop-name">{it.get("name","товар")}</div>
+        <div class="shop-lvl">⭐{it.get("level","?")}</div>
+        <div class="shop-stats">{it.get("desc","")}</div>
+        </div>
+        <div class="shop-price">{price or "Бесплатно"}</div>
+        </div>
+        '''
     sorts_html = f'''
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
       <a href="/shop/{cat}?sort=none" style="padding:7px 10px;background:{'#ff9c00' if sort=='none' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">Нет</a>
