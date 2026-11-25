@@ -805,23 +805,35 @@ def shop_cat(cat):
         cards = '<div class="shop-list">'
         for it in items:
             price = ""
-            if it.get("gold"): price += f'{it["gold"]}🪙 '
-            if it.get("silver"): price += f'{it["silver"]}⚪ '
-            if it.get("rubin"): price += f'{it["rubin"]}💎 '
-            import json as _json; item_json = _json.dumps(it, ensure_ascii=False).replace('"','&quot;')
-        cards = f'''
-        <div class="shop-card" data-item="{item_json}" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))">
-        <div class="shop-icon">{it.get("icon","🗡️")}</div>
-        <div class="shop-info">
-        <div class="shop-name">{it.get("name","товар")}</div>
-        <div class="shop-lvl">⭐{it.get("level","?")}</div>
-        <div class="shop-stats">{it.get("desc","")}</div>
-        </div>
-        <div class="shop-price">{price or "Бесплатно"}</div>
-        </div>
-        '''
-    sorts_html = f'''
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
+            if it.get("gold"): price = f'{it["gold"]} 🟡'
+            if it.get("silver"): price = f'{it["silver"]} ⚪'
+            if it.get("rubin"): price = f'{it["rubin"]} 🔴'
+            import json as _json
+            item_json = _json.dumps(it, ensure_ascii=False).replace('"','&quot;')
+            hp = it.get("health", it.get("hp", 0))
+            dmg = it.get("damage", 0)
+            acc = it.get("accuracy", 0)
+            stun = it.get("stun", 0)
+            block = it.get("block", 0)
+            dodge = it.get("dodge", 0)
+            armor = it.get("armor", 0)
+            weight = it.get("weight", 20)
+            stats = f"❤️{hp} ⚔️{dmg} 🎯{acc} 🟢{stun}"
+            if block: stats += f" 🛡️{block}"
+            if dodge: stats += f" 💨{dodge}"
+            if armor: stats += f" 🛡️{armor}"
+            cards += f'''
+                <div class="shop-card" onclick="openItemModal(JSON.parse(this.getAttribute('data-item')))" data-item="{item_json}">
+                  <div class="shop-icon">{it.get("icon","🗡️")}</div>
+                  <div class="shop-main">
+                    <div class="shop-top"><span class="shop-name">{it.get("name","товар")}</span><span class="shop-lvl">⭐ {it.get("level","?")}</span></div>
+                    <div class="shop-weight">{weight}</div>
+                    <div class="shop-stats">{stats}</div>
+                  </div>
+                  <div class="shop-price">{price or "Бесплатно"}</div>
+                </div>'''
+        cards += '</div>'
+    sorts_html = f'''<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0">
       <a href="/shop/{cat}?sort=none" style="padding:7px 10px;background:{'#ff9c00' if sort=='none' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">Нет</a>
       <a href="/shop/{cat}?sort=damage" style="padding:7px 10px;background:{'#ff9c00' if sort=='damage' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">⚔️ Урон</a>
       <a href="/shop/{cat}?sort=dodge" style="padding:7px 10px;background:{'#ff9c00' if sort=='dodge' else '#5a3e22'};color:#fff;border-radius:8px;text-decoration:none;font-size:13px">💨 Уворот</a>
