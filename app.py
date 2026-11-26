@@ -623,7 +623,7 @@ def fight_battle():
         e_uvorot = 8
         missed = False; blocked = False; is_crit = False; stunned = False
         dmg = 0; edmg = 0
-                def enemy_hit():
+        def enemy_hit():
             nonlocal cur_my
             if f.get("shield_active"):
                 f["shield_active"] = False; return 0
