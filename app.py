@@ -606,25 +606,64 @@ def fight_battle():
             return jsonify({"status": "blocked", "msg": "⛔ Из боя нельзя выйти! Бейся до конца!", "enemy_hp": int(f["enemy_hp"]), "my_hp": int(f["my_hp"]), "finished": False})
         cur_my = int(f["my_hp"]); cur_en = int(f["enemy_hp"]); hit_cnt = int(f.get("hit_count",0))
         super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
+                # ===== MOBITVA STATS v1 =====
+        # Игрок: Toch / Block / Uron / Bron / Glush / Uvorot
+        p_toch = 10 + lvl * 2
+        p_block = 8 + lvl
+        p_uron = 5 + lvl * 2
+        p_bron = 2 + lvl
+        p_glush = 5
+        p_uvorot = 8 + lvl
+        # Враг: считаем из его урона и HP
+        e_toch = 10
+        e_block = 8
+        e_uron = (int(f.get("enemy_dmg_min",2)) + int(f.get("enemy_dmg_max",4))) // 2
+        e_bron = 2
+        e_glush = 5
+        e_uvorot = 8
+        missed = False; blocked = False; is_crit = False; stunned = False
         dmg = 0; edmg = 0
-        def enemy_hit():
+                def enemy_hit():
             nonlocal cur_my
             if f.get("shield_active"):
                 f["shield_active"] = False; return 0
-            emin, emax = int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4))
-            d = random.randint(emin, emax); cur_my = max(0, cur_my - d); return d
+            hit_ch = max(10, min(95, 75 + (e_toch - p_uvorot) * 2))
+            if random.randint(1, 100) > hit_ch:
+                return 0
+            if random.randint(1, 100) <= p_block:
+                d = max(1, int((e_uron - p_bron) * 0.5))
+            else:
+                d = max(1, e_uron - p_bron)
+            d = int(d * random.uniform(0.85, 1.15))
+            cur_my = max(0, cur_my - d); return d
         if m == "shield" and cur_my > 0 and cur_en > 0:
             f["shield_active"] = True; edmg = enemy_hit()
         elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
             if f.get("shield_active"):
                 edmg = 0; f["shield_active"] = False
             else:
-                edmg = random.randint(int(f.get("enemy_dmg_min",2)), int(f.get("enemy_dmg_max",4))); cur_my = max(0, cur_my - edmg)
+                edmg = enemy_hit()
             dmg = 0
         elif m == "hit" and cur_my > 0 and cur_en > 0:
-            dmg = random.randint(3, 7); cur_en = max(0, cur_en - dmg); hit_cnt += 1; super_hits += 1; edmg = 0
+            hit_ch = max(10, min(95, 75 + (p_toch - e_uvorot) * 2))
+            if random.randint(1, 100) > hit_ch:
+                missed = True; dmg = 0
+            else:
+                if random.randint(1, 100) <= e_block:
+                    blocked = True; dmg = max(1, int((p_uron - e_bron) * 0.5))
+                else:
+                    dmg = max(1, p_uron - e_bron)
+                dmg = int(dmg * random.uniform(0.85, 1.15))
+                if random.randint(1, 100) <= p_glush:
+                    stunned = True
+            if dmg > 0:
+                cur_en = max(0, cur_en - dmg)
+            hit_cnt += 1; super_hits += 1; edmg = 0
         elif m == "super" and cur_my > 0 and cur_en > 0 and super_used < 4 and super_hits >= 5:
-            dmg = random.randint(10, 18); cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0; edmg = 0
+            dmg = max(1, (p_uron - e_bron) * 2)
+            dmg = int(dmg * random.uniform(0.9, 1.2))
+            is_crit = True
+            cur_en = max(0, cur_en - dmg); super_used += 1; super_hits = 0; edmg = 0
         f["enemy_hp"] = cur_en; f["my_hp"] = cur_my; f["hit_count"] = hit_cnt
         f["super_used"] = super_used; f["super_hits"] = super_hits; f["last_seen"] = int(time.time())
         save_fight_db(uid, f)
@@ -637,7 +676,7 @@ def fight_battle():
             add_win(uid); session["rewarded"] = True; finished = True; is_win = True
         elif cur_my <= 0:
             add_loss(uid); session["rewarded"] = True; finished = True; is_win = False
-        return jsonify({"enemy_hp": cur_en, "enemy_max": int(f.get("enemy_max",20)), "my_hp": cur_my, "my_max": my_max_hp, "hit_cnt": hit_cnt, "last_dmg": dmg, "edmg": edmg, "finished": finished, "is_win": is_win, "reward_g": int(f.get("reward_g",0)), "reward_s": int(f.get("reward_s",0)), "reward_r": int(f.get("reward_r",0)), "super_used": super_used, "need_for_next": need_for_next})
+        return jsonify({"enemy_hp": cur_en, "enemy_max": int(f.get("enemy_max",20)), "my_hp": cur_my, "my_max": my_max_hp, "hit_cnt": hit_cnt, "last_dmg": dmg, "edmg": edmg, "finished": finished, "is_win": is_win, "reward_g": int(f.get("reward_g",0)), "reward_s": int(f.get("reward_s",0)), "reward_r": int(f.get("reward_r",0)), "super_used": super_used, "need_for_next": need_for_next, "missed": missed, "blocked": blocked, "stunned": stunned, "crit": is_crit})
     cur_enemy_hp = int(f["enemy_hp"]); enemy_max_hp = int(f.get("enemy_max",20)); cur_my_hp = int(f["my_hp"]); hit_cnt = int(f.get("hit_count",0))
     enemy_name = f.get("enemy_name", "Древний Воин"); enemy_img = f.get("enemy_img", "ancient_warrior.png")
     super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
@@ -1170,4 +1209,53 @@ def admin():
     return render_page(html, False)
 
 if __name__ == "__main__":
+    # ===== BATTLE v1 - Toch/Block/Uron/Bron/Glush/Uvorot =====
+    import random
+
+def calc_battle_turn(attacker, defender, hit_zone):
+    """attacker/defender = dict с Toch, Block, Uron, Bron, Glush, Uvorot"""
+    # 1. Попадание: точность vs уворот
+    hit_chance = 75 + (attacker.get("Toch", 10) - defender.get("Uvorot", 10)) * 2
+    hit_chance = max(10, min(95, hit_chance))
+    if random.randint(1, 100) > hit_chance:
+        return {"result": "uvorot", "dmg": 0, "text": "Уворот! Промах"}
+
+    # 2. Блок
+    blocked = random.randint(1, 100) <= defender.get("Block", 5)
+
+    # 3. Урон: Урон - Броня, минимум 1
+    dmg = max(1, attacker.get("Uron", 10) - defender.get("Bron", 0))
+    dmg = int(dmg * random.uniform(0.85, 1.15))
+    if blocked:
+        dmg = max(1, dmg // 2)
+
+    # 4. Глуш - оглушение на 1 ход
+    stunned = random.randint(1, 100) <= attacker.get("Glush", 5)
+
+    # 5. Суперудар - комбо [1,2,1] = голова-тело-голова
+    is_super = False
+    seq = attacker.get("_seq", [])
+    seq.append(hit_zone)
+    seq = seq[-3:]
+    attacker["_seq"] = seq
+    if seq == [1, 2, 1]:
+        dmg *= 2
+        is_super = True
+        attacker["_seq"] = []
+
+    return {"result": "block" if blocked else "hit", "dmg": dmg, "stunned": stunned, "super": is_super, "text": f"Суперудар! {dmg}" if is_super else f"Урон {dmg}"}
+
+@app.route("/battle")
+def battle_page():
+    return render_template("battle.html")
+
+@app.route("/api/battle_hit", methods=["POST"])
+def battle_hit():
+    d = request.get_json() or {}
+    # пока тестовый противник, потом возьмем из БД
+    attacker = {"Toch": 15, "Block": 10, "Uron": 20, "Bron": 5, "Glush": 8, "Uvorot": 12, "_seq": d.get("seq", [])}
+    defender = {"Toch": 12, "Block": 8, "Uron": 18, "Bron": 4, "Glush": 5, "Uvorot": 10}
+    res = calc_battle_turn(attacker, defender, int(d.get("zone", 1)))
+    res["seq"] = attacker["_seq"]
+    return jsonify(res)
     app.run(host="0.0.0.0", port=5000, debug=True)
