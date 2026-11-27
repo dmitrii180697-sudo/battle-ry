@@ -545,6 +545,11 @@ def _monster_cards(monsters, loc_code):
 @app.route("/promysel")
 def promysel():
     if "uid" not in session: return redirect("/")
+    # Чистка призраков - удаляем мертвые бои
+    for fid in list(ACTIVE_FIGHTS.keys()):
+        ff = get_fight_db(fid)
+        if not ff or int(ff.get("enemy_hp", 0)) <= 0:
+            ACTIVE_FIGHTS.pop(fid, None)
     MONSTERS = get_monsters()
     cur = session.get("current_loc", "lager")
     cards = _monster_cards(MONSTERS, cur)
