@@ -551,6 +551,31 @@ def promysel():
     if not cards:
         cards = '<p style="text-align:center">В этой локации пока нет монстров. Админ может добавить!</p>'
     body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
+        body += """
+    <button onclick="toggleFights()" style="width:100%;background:#7a1fa2;color:#fff;padding:14px;border:none;border-radius:12px;font-weight:900;font-size:16px;margin-top:12px">⚔️ Текущие бои (<span id="fightCount">0</span>)</button>
+    <div id="activeFightsBox" style="display:none;margin-top:10px"></div>
+    <script>
+    async function toggleFights(){
+      let box = document.getElementById("activeFightsBox");
+      if(box.style.display === "block"){ box.style.display="none"; return; }
+      box.style.display="block"; loadFights();
+    }
+    async function loadFights(){
+      let r = await fetch("/api/active_fights");
+      let d = await r.json();
+      let box = document.getElementById("activeFightsBox");
+      document.getElementById("fightCount").textContent = d.fights.length;
+      if(!d.fights.length){ box.innerHTML = "<div style='background:#222;color:#fff;padding:12px;border-radius:10px'>Сейчас никто не в бою. Стань первым!</div>"; return; }
+      box.innerHTML = d.fights.map(f => `
+        <div style="background:#2b1a0e;border:2px solid #c89b5e;border-radius:12px;padding:12px;margin-bottom:8px;text-align:left;color:#fff">
+          <b>👹 ${f.enemy_type}</b> — HP: ${f.enemy_hp}/${f.enemy_max}<br>
+          <span style="color:#ffcc00">⚔️ Бьёт: ${f.players.join(", ")}</span><br>
+          <a href="/join_fight/${f.uid}" style="display:block;background:#2e7d32;color:#fff;text-align:center;padding:10px;border-radius:8px;margin-top:8px;text-decoration:none;font-weight:900">➕ Помочь в бою</a>
+        </div>`).join("");
+    }
+    setInterval(()=>{ let b=document.getElementById("activeFightsBox"); if(b && b.style.display==="block") loadFights(); }, 3000);
+    </script>
+    """
     return render_page(body, True)
 
 @app.route("/loc/<code>")
@@ -580,7 +605,30 @@ RAID = {
     "reward_s": 0,
     "reward_r": 0,
 }
-RAID_TURN_TIME = 20  # сек на ход, как твой таймер
+# --- АКТИВНЫЕ БОИ для Промысла ---
+ACTIVE_FIGHTS = {}
+
+@app.route("/api/active_fights")
+def api_active_fights():
+    out = []
+    for uid, info in list(ACTIVE_FIGHTS.items()):
+        out.append({
+            "uid": uid,
+            "name": info.get("name", "Игрок"),
+            "enemy_type": info.get("enemy_type", "Враг"),
+            "enemy_hp": info.get("enemy_hp", 0),
+            "enemy_max": info.get("enemy_max", 1),
+            "players": info.get("players", []),
+        })
+    return {"fights": out}
+
+@app.route("/join_fight/<uid>")
+def join_fight(uid):
+    if uid in ACTIVE_FIGHTS:
+        session["join_uid"] = uid
+        return redirect("/fight_battle")
+    return redirect("/promysel")
+RAID_TURN_TIME = 15  # сек на ход, как твой таймер
 
 def raid_current_uid():
     if not RAID["turn_order"]:
