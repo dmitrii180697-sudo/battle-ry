@@ -742,40 +742,56 @@ def fight(monster):
     session["reward_g"] = cfg.get("gold", 2); session["reward_s"] = cfg.get("silver", 10); session["reward_r"] = cfg.get("rubin", 0)
     session.modified = True
     ACTIVE_FIGHTS[session["uid"]] = {
-    "name": p.get("name", "Игрок"),
-    "enemy_type": cfg.get("name", monster),
-    "enemy_hp": int(cfg.get("hp", 20)),
-    "enemy_max": int(cfg.get("hp", 20)),
-    "players": [session["uid"]],
-}
+        "name": p.get("name", "Игрок"),
+        "enemy_type": cfg.get("name", monster),
+        "enemy_hp": int(cfg.get("hp", 20)),
+        "enemy_max": int(cfg.get("hp", 20)),
+        "players": [session["uid"]],
+    }
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET", "POST"])
 def fight_battle():
-    if "uid" not in session: return redirect("/")
+    if "uid" not in session:
+        return redirect("/")
     uid = session["uid"]
-fight_owner = session.get("join_uid") or uid
-if fight_owner not in ACTIVE_FIGHTS:
-    fight_owner = uid
-    session.pop("join_uid", None)
-f = get_fight_db(fight_owner)
-if not f:
-        if "enemy_hp" not in session: return redirect("/promysel")
+    fight_owner = session.get("join_uid") or uid
+    if fight_owner not in ACTIVE_FIGHTS:
+        fight_owner = uid
+        session.pop("join_uid", None)
+    f = get_fight_db(fight_owner)
+    if not f:
+        if "enemy_hp" not in session:
+            return redirect("/promysel")
         f = {"enemy": "warrior", "enemy_hp": session.get("enemy_hp", 20), "enemy_max": session.get("enemy_max", 20), "enemy_dmg_min": session.get("enemy_dmg", [2,4])[0], "enemy_dmg_max": session.get("enemy_dmg", [2,4])[1], "enemy_img": session.get("enemy_img", "ancient_warrior.png"), "enemy_name": session.get("enemy_type", "Древний Воин"), "my_hp": session.get("my_hp", 20), "hit_count": session.get("hit_count", 0), "super_used": session.get("super_used", 0), "super_hits": session.get("super_hits", 0), "shield_active": session.get("shield_active", False), "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0), "last_seen": int(time.time())}
         save_fight_db(fight_owner, f)
     f = apply_offline_damage(uid, f)
     if int(f.get("my_hp", 1)) <= 0:
-        add_loss(uid); session.pop("enemy_hp", None); return redirect("/game")
-    f["last_seen"] = int(time.time()); save_fight_db(uid, f)
-    session["enemy_hp"] = int(f["enemy_hp"]); session["my_hp"] = int(f["my_hp"]); session["hit_count"] = int(f.get("hit_count",0))
-    session["super_used"] = int(f.get("super_used",0)); session["super_hits"] = int(f.get("super_hits",0)); session["shield_active"] = bool(f.get("shield_active"))
-    session["reward_g"] = int(f.get("reward_g",0)); session["reward_s"] = int(f.get("reward_s",0)); session["reward_r"] = int(f.get("reward_r",0))
-    session["enemy_type"] = f.get("enemy_name"); session["enemy_img"] = f.get("enemy_img"); session["enemy_max"] = int(f.get("enemy_max",20))
-    p = get_player(uid); lvl, my_max_hp, rubin, gold, silver = vals(p)
+        add_loss(uid)
+        session.pop("enemy_hp", None)
+        return redirect("/game")
+    f["last_seen"] = int(time.time())
+    save_fight_db(uid, f)
+    session["enemy_hp"] = int(f["enemy_hp"])
+    session["my_hp"] = int(f["my_hp"])
+    session["hit_count"] = int(f.get("hit_count",0))
+    session["super_used"] = int(f.get("super_used",0))
+    session["super_hits"] = int(f.get("super_hits",0))
+    session["shield_active"] = bool(f.get("shield_active"))
+    session["reward_g"] = int(f.get("reward_g",0))
+    session["reward_s"] = int(f.get("reward_s",0))
+    session["reward_r"] = int(f.get("reward_r",0))
+    session["enemy_type"] = f.get("enemy_name")
+    session["enemy_img"] = f.get("enemy_img")
+    session["enemy_max"] = int(f.get("enemy_max",20))
+    p = get_player(uid)
+    lvl, my_max_hp, rubin, gold, silver = vals(p)
+
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
         m = data.get("m") or request.form.get("m", "hit")
-                # --- РЕЙД: проверка хода ---
+
+        # --- РЕЙД: проверка хода ---
         is_raid = bool(f.get("is_raid")) or session.get("is_raid")
         if is_raid and RAID["active"]:
             raid_check_timeout()
@@ -786,9 +802,14 @@ if not f:
                     "blocked_turn": True, "msg": "Не твой ход!"})
         if m == "run":
             return jsonify({"status": "blocked", "msg": "⛔ Из боя нельзя выйти! Бейся до конца!", "enemy_hp": int(f["enemy_hp"]), "my_hp": int(f["my_hp"]), "finished": False})
-        cur_my = int(f["my_hp"]); cur_en = int(f["enemy_hp"]); hit_cnt = int(f.get("hit_count",0))
-        super_used = int(f.get("super_used",0)); super_hits = int(f.get("super_hits",0))
-                # ===== MOBITVA STATS v1 =====
+
+        cur_my = int(f["my_hp"])
+        cur_en = int(f["enemy_hp"])
+        hit_cnt = int(f.get("hit_count",0))
+        super_used = int(f.get("super_used",0))
+        super_hits = int(f.get("super_hits",0))
+
+        # ===== MOBITVA STATS v1 =====
         # Игрок: Toch / Block / Uron / Bron / Glush / Uvorot
         p_toch = 10 + lvl * 2
         p_block = 8 + lvl
@@ -796,6 +817,7 @@ if not f:
         p_bron = 2 + lvl
         p_glush = 5
         p_uvorot = 8 + lvl
+
         # Враг: считаем из его урона и HP
         e_toch = 10
         e_block = 8
@@ -803,12 +825,18 @@ if not f:
         e_bron = 2
         e_glush = 5
         e_uvorot = 8
-        missed = False; blocked = False; is_crit = False; stunned = False
-        dmg = 0; edmg = 0
+        missed = False
+        blocked = False
+        is_crit = False
+        stunned = False
+        dmg = 0
+        edmg = 0
+
         def enemy_hit():
             nonlocal cur_my
             if f.get("shield_active"):
-                f["shield_active"] = False; return 0
+                f["shield_active"] = False
+                return 0
             hit_ch = max(10, min(95, 75 + (e_toch - p_uvorot) * 2))
             if random.randint(1, 100) > hit_ch:
                 return 0
@@ -817,7 +845,9 @@ if not f:
             else:
                 d = max(1, e_uron - p_bron)
             d = int(d * random.uniform(0.85, 1.15))
-            cur_my = max(0, cur_my - d); return d
+            cur_my = max(0, cur_my - d)
+            return d
+
         if m == "shield" and cur_my > 0 and cur_en > 0:
             f["shield_active"] = True; edmg = enemy_hit()
         elif m == "enemy_turn" and cur_my > 0 and cur_en > 0:
