@@ -551,7 +551,7 @@ def promysel():
     if not cards:
         cards = '<p style="text-align:center">В этой локации пока нет монстров. Админ может добавить!</p>'
     body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
-    body += """
+    fights_btn = """
     <button onclick="toggleFights()" style="width:100%;background:#7a1fa2;color:#fff;padding:14px;border:none;border-radius:12px;font-weight:900;font-size:16px;margin-top:12px">⚔️ Текущие бои (<span id="fightCount">0</span>)</button>
     <div id="activeFightsBox" style="display:none;margin-top:10px"></div>
     <script>
@@ -576,6 +576,7 @@ def promysel():
     setInterval(()=>{ let b=document.getElementById("activeFightsBox"); if(b && b.style.display==="block") loadFights(); }, 3000);
     </script>
     """
+    body = body.replace('<a href="/game"', fights_btn + '<a href="/game"')
     return render_page(body, True)
 
 @app.route("/loc/<code>")
@@ -735,6 +736,13 @@ def fight(monster):
     session["super_used"] = 0; session["super_hits"] = 0; session["shield_active"] = False
     session["reward_g"] = cfg.get("gold", 2); session["reward_s"] = cfg.get("silver", 10); session["reward_r"] = cfg.get("rubin", 0)
     session.modified = True
+    ACTIVE_FIGHTS[session["uid"]] = {
+    "name": p.get("name", "Игрок"),
+    "enemy_type": cfg.get("name", monster),
+    "enemy_hp": int(cfg.get("hp", 20)),
+    "enemy_max": int(cfg.get("hp", 20)),
+    "players": [session["uid"]],
+}
     return redirect("/fight_battle")
 
 @app.route("/fight_battle", methods=["GET", "POST"])
