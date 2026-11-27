@@ -551,7 +551,7 @@ def promysel():
     if not cards:
         cards = '<p style="text-align:center">В этой локации пока нет монстров. Админ может добавить!</p>'
     body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">🌲 Промысел</h3>{cards}<a href="/game" class="btn-orange">← На главную</a></div>'
-        body += """
+    body += """
     <button onclick="toggleFights()" style="width:100%;background:#7a1fa2;color:#fff;padding:14px;border:none;border-radius:12px;font-weight:900;font-size:16px;margin-top:12px">⚔️ Текущие бои (<span id="fightCount">0</span>)</button>
     <div id="activeFightsBox" style="display:none;margin-top:10px"></div>
     <script>
