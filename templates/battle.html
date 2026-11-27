@@ -35,8 +35,8 @@
 <div id="fightWrap">
   <div class="battle-names"><span>ТЫ ({{ lvl|default(1) }} ур.)</span><span id="battle-timer">20</span><span>{{ enemy_type|default('Враг') }}</span></div>
 
-  <div style="text-align:center;margin:8px 0 0"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00;transition:width .2s"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 20 сек</div></div>
-
+  <div style="text-align:center;margin:8px 0 0"><div style="height:8px;background:#222;border-radius:10px;overflow:hidden"><div id="timerBar" style="height:100%;width:100%;background:#ffcc00;transition:width .2s"></div></div><div id="turnText" style="font-size:13px;color:#ffcc00;margin-top:3px">Твой ход! 15 сек</div></div>
+<div id="raidBanner" style="display:none;background:#7a1fa2;color:#fff;padding:8px;border-radius:8px;margin-top:6px;font-weight:bold;font-size:14px">⚔️ РЕЙД: ждём свой ход...</div>
   <div style="display:flex;gap:10px;margin-top:6px">
     <div style="flex:1;text-align:left"><div class="hp-row"><span>ВЫ</span><span><span id="myHp">{{ my_hp|default(20) }}</span> / {{ my_max_hp|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill" id="myBar" style="width:{{ my_per|default(100) }}%"></div></div></div>
     <div style="flex:1;text-align:right"><div class="hp-row"><span>{{ enemy_type|default('Враг') }}</span><span><span id="enHp">{{ enemy_hp|default(20) }}</span> / {{ enemy_max|default(20) }}</span></div><div class="hp-bar"><div class="hp-fill enemy" id="enBar" style="width:{{ enemy_per|default(100) }}%"></div></div></div>
@@ -79,4 +79,52 @@
 
 <script src="/static/game.js"></script>
 </body>
+<script>
+// ===== РЕЙД: опрос /raid_state каждые 2 сек =====
+let raidActive = false;
+let myTurn = true;
+
+async function pollRaid(){
+  try{
+    let r = await fetch("/raid_state");
+    let d = await r.json();
+    if(!d.active){
+      if(raidActive){ raidActive=false; document.getElementById("raidBanner").style.display="none"; }
+      return;
+    }
+    raidActive = true;
+    myTurn = d.my_turn;
+    let banner = document.getElementById("raidBanner");
+    banner.style.display = "block";
+    if(d.finished){
+      banner.textContent = "🏆 РЕЙД-БОСС ПОВЕРЖЕН!";
+      banner.style.background = "#2e7d32";
+      return;
+    }
+    if(d.my_turn){
+      banner.textContent = "🔥 ТВОЙ ХОД! Бей!";
+      banner.style.background = "#2e7d32";
+    } else {
+      banner.textContent = "⏳ Ход: " + d.current_name + " (" + d.turn_order_len + " в рейде)";
+      banner.style.background = "#7a1fa2";
+    }
+    // Обновляем ХП монстра у всех
+    let enHpEl = document.getElementById("enHp");
+    let enBarEl = document.getElementById("enBar");
+    if(enHpEl) enHpEl.textContent = d.monster_hp;
+    if(enBarEl) enBarEl.style.width = (d.monster_hp*100/d.monster_max) + "%";
+    // Блокируем кнопки, если не мой ход
+    let hitBtn = document.getElementById("hitBtn");
+    let superBtn = document.getElementById("superBtn");
+    let shieldBtn = document.getElementById("shieldBtn");
+    if(hitBtn) hitBtn.disabled = !d.my_turn;
+    if(superBtn) superBtn.disabled = !d.my_turn;
+    if(shieldBtn) shieldBtn.disabled = !d.my_turn;
+    let turnText = document.getElementById("turnText");
+    if(turnText) turnText.textContent = d.my_turn ? "Твой ход! Бей!" : "Ход: " + d.current_name;
+  }catch(e){}
+}
+setInterval(pollRaid, 2000);
+pollRaid();
+</script>
 </html>

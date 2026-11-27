@@ -562,7 +562,115 @@ def go_loc(code):
     loc_name = LOCATIONS[code]["name"]
     body = f'<div class="wrap" style="background:#e8d6a8;padding:10px"><h3 style="text-align:center">{loc_name}</h3><a href="/game" class="btn-orange">← На главную</a><a href="/map" class="btn-orange">📍 Карта</a></div>'
     return render_page(body, True)
+# ===== РЕЙД: 25 игроков vs 1 монстр =====
+# Один общий монстр на всех, ходит по кругу
+RAID = {
+    "active": False,
+    "monster": "warrior",
+    "enemy_hp": 0,
+    "enemy_max": 0,
+    "enemy_name": "",
+    "enemy_img": "",
+    "enemy_dmg_min": 2,
+    "enemy_dmg_max": 4,
+    "turn_order": [],  # [uid1, uid2, ...]
+    "turn_idx": 0,
+    "turn_started": 0,
+    "reward_g": 0,
+    "reward_s": 0,
+    "reward_r": 0,
+}
+RAID_TURN_TIME = 20  # сек на ход, как твой таймер
 
+def raid_current_uid():
+    if not RAID["turn_order"]:
+        return None
+    return RAID["turn_order"][RAID["turn_idx"] % len(RAID["turn_order"])]
+
+def raid_advance():
+    # Переход к следующему живому игроку
+    if not RAID["turn_order"]:
+        return
+    for _ in range(len(RAID["turn_order"])):
+        RAID["turn_idx"] += 1
+        uid = raid_current_uid()
+        f = get_fight_db(uid)
+        if f and int(f.get("my_hp", 0)) > 0:
+            break
+    RAID["turn_started"] = int(time.time())
+
+def raid_check_timeout():
+    # Если текущий игрок завис / AFK - пропускаем его
+    if not RAID["active"] or not RAID["turn_order"]:
+        return
+    if int(time.time()) - RAID["turn_started"] > RAID_TURN_TIME:
+        raid_advance()
+
+@app.route("/raid/<monster>")
+def raid_start(monster):
+    if "uid" not in session: return redirect("/")
+    uid = session["uid"]
+    MONSTERS = get_monsters()
+    cfg = MONSTERS.get(monster, MONSTERS["warrior"])
+    # Первый зашедший - создает рейд
+    if not RAID["active"]:
+        RAID.update({
+            "active": True,
+            "monster": monster,
+            "enemy_hp": cfg.get("hp", 20) * 10,  # рейд-босс в 10 раз жирнее
+            "enemy_max": cfg.get("hp", 20) * 10,
+            "enemy_name": cfg["name"],
+            "enemy_img": cfg.get("img", "ancient_warrior.png"),
+            "enemy_dmg_min": cfg.get("dmg", [2,4])[0],
+            "enemy_dmg_max": cfg.get("dmg", [2,4])[1],
+            "turn_order": [],
+            "turn_idx": 0,
+            "turn_started": int(time.time()),
+            "reward_g": cfg.get("gold", 2),
+            "reward_s": cfg.get("silver", 10),
+            "reward_r": cfg.get("rubin", 0),
+        })
+    # Добавляем себя в очередь, если еще нет
+    if uid not in RAID["turn_order"]:
+        RAID["turn_order"].append(uid)
+    # Свой личный бой создаем как обычно, но ХП врага берем из RAID
+    p = get_player(uid); l, h, r, g, s_ = vals(p)
+    save_fight_db(uid, {"enemy": monster, "enemy_hp": RAID["enemy_hp"], "enemy_max": RAID["enemy_max"],
+        "enemy_dmg_min": RAID["enemy_dmg_min"], "enemy_dmg_max": RAID["enemy_dmg_max"],
+        "enemy_img": RAID["enemy_img"], "enemy_name": RAID["enemy_name"],
+        "my_hp": h, "hit_count": 0, "super_used": 0, "super_hits": 0,
+        "shield_active": False, "reward_g": RAID["reward_g"], "reward_s": RAID["reward_s"],
+        "reward_r": RAID["reward_r"], "last_seen": int(time.time()), "is_raid": True})
+    session["is_raid"] = True
+    return redirect("/fight_battle")
+
+@app.route("/raid_state")
+def raid_state():
+    if "uid" not in session: return jsonify({"error": "no uid"})
+    uid = session["uid"]
+    raid_check_timeout()
+    if not RAID["active"]:
+        return jsonify({"active": False, "my_turn": False})
+    cur = raid_current_uid()
+    p = get_player(cur) if cur else None
+    cur_name = "Игрок"
+    try:
+        # имя - попробуй взять из get_player, если там есть name
+        cur_name = p.get("name", "Игрок") if isinstance(p, dict) else str(cur)
+    except: pass
+    return jsonify({
+        "active": True,
+        "monster_hp": RAID["enemy_hp"],
+        "monster_max": RAID["enemy_max"],
+        "current_target_id": cur,
+        "current_name": cur_name,
+        "my_id": uid,
+        "my_turn": (cur == uid),
+        "finished": RAID["enemy_hp"] <= 0,
+        "is_win": RAID["enemy_hp"] <= 0,
+        "turn_order_len": len(RAID["turn_order"])
+    })
+# ===== КОНЕЦ РЕЙДА =====
 @app.route("/fight/<monster>")
 def fight(monster):
     if "uid" not in session: return redirect("/")
@@ -602,6 +710,15 @@ def fight_battle():
     if request.method == "POST":
         data = request.get_json(silent=True) or {}
         m = data.get("m") or request.form.get("m", "hit")
+                # --- РЕЙД: проверка хода ---
+        is_raid = bool(f.get("is_raid")) or session.get("is_raid")
+        if is_raid and RAID["active"]:
+            raid_check_timeout()
+            if m in ("hit", "super", "shield") and raid_current_uid() != uid:
+                return jsonify({"enemy_hp": RAID["enemy_hp"], "enemy_max": RAID["enemy_max"],
+                    "my_hp": int(f["my_hp"]), "my_max": my_max_hp, "hit_cnt": int(f.get("hit_count",0)),
+                    "last_dmg": 0, "edmg": 0, "finished": False, "is_win": False,
+                    "blocked_turn": True, "msg": "Не твой ход!"})
         if m == "run":
             return jsonify({"status": "blocked", "msg": "⛔ Из боя нельзя выйти! Бейся до конца!", "enemy_hp": int(f["enemy_hp"]), "my_hp": int(f["my_hp"]), "finished": False})
         cur_my = int(f["my_hp"]); cur_en = int(f["enemy_hp"]); hit_cnt = int(f.get("hit_count",0))
@@ -667,6 +784,13 @@ def fight_battle():
         f["enemy_hp"] = cur_en; f["my_hp"] = cur_my; f["hit_count"] = hit_cnt
         f["super_used"] = super_used; f["super_hits"] = super_hits; f["last_seen"] = int(time.time())
         save_fight_db(uid, f)
+                # --- РЕЙД: синхронизация общего ХП и переход хода ---
+        if is_raid and RAID["active"]:
+            if m in ("hit", "super"):
+                RAID["enemy_hp"] = max(0, cur_en)
+                raid_advance()
+                if RAID["enemy_hp"] <= 0:
+                    RAID["active"] = False
         session["enemy_hp"] = cur_en; session["my_hp"] = cur_my; session["hit_count"] = hit_cnt
         session["super_used"] = super_used; session["super_hits"] = super_hits; session.modified = True
         need_for_next = 0 if super_used >= 4 else (5 - super_hits)

@@ -2,7 +2,20 @@ let canAttack = true;
 let timeLeft = 20;
 let timerInt = null;
 
-// Интервал между ударами - 1.1 сек. Хочешь медленнее - поставь 1500
+// ===== РЕЙД: 25 игроков vs 1 монстр, у каждого свой экран =====
+let raid = {
+  enabled: false, // true когда бой - рейд, false когда обычный 1 на 1
+  monsterHp: 0,
+  monsterMaxHp: 0,
+  turnOrder: [], // [id1, id2, ...]
+  currentTargetId: 0,
+  myId: 0,
+  myTurn: false,
+  currentName: ''
+};
+let raidPollInt = null;
+// =============================================================
+
 const ATTACK_COOLDOWN = 1100;
 let lastAttackTime = 0;
 let shieldActive = false;
@@ -29,6 +42,12 @@ function updateTimerUI(){
   let big = document.getElementById('battle-timer');
   if(bar) bar.style.width = Math.max(0, timeLeft*5) + '%';
   if(bar) bar.style.background = timeLeft <= 5 ? '#ff4444' : '#ffcc00';
+  // В рейде текст таймера показывает чей ход
+  if(raid.enabled && !raid.myTurn){
+    if(txt) txt.innerText = 'Ход: ' + (raid.currentName || 'другой игрок') + ' — жди...';
+    if(big) big.innerText = '⏳';
+    return;
+  }
   if(txt && timeLeft > 0) txt.innerText = 'Твой ход! ' + timeLeft + ' сек';
   if(big) big.innerText = Math.max(0, timeLeft);
 }
@@ -51,8 +70,77 @@ function useScroll(n){
   if(slots[n-1]){ slots[n-1].style.background = '#3a3a7a'; setTimeout(()=>{ slots[n-1].style.background=''; }, 300); }
 }
 
+// ===== РЕЙД: обновить кнопки по очереди =====
+function updateRaidButtons(){
+  if(!raid.enabled) return;
+  let hitBtn = document.getElementById('hitBtn');
+  let superBtn = document.getElementById('superBtn');
+  let shieldBtn = document.getElementById('shieldBtn');
+  let disabled = !raid.myTurn;
+  [hitBtn, superBtn, shieldBtn].forEach(b => {
+    if(b){ b.disabled = disabled; b.classList.toggle('cooldown', disabled); }
+  });
+  updateTimerUI();
+}
+
+// ===== РЕЙД: спрашиваем у сервера чья очередь =====
+async function pollRaid(){
+  if(!raid.enabled) return;
+  try{
+    let resp = await fetch('/raid_state');
+    let data = await resp.json();
+    // data = {monster_hp, monster_max, current_target_id, current_name, my_id, my_turn, finished, is_win}
+    if(data.monster_hp !== undefined) raid.monsterHp = data.monster_hp;
+    if(data.monster_max !== undefined) raid.monsterMaxHp = data.monster_max;
+    if(data.current_target_id !== undefined) raid.currentTargetId = data.current_target_id;
+    if(data.current_name !== undefined) raid.currentName = data.current_name;
+    if(data.my_id !== undefined) raid.myId = data.my_id;
+
+    let wasMyTurn = raid.myTurn;
+    raid.myTurn = !!data.my_turn;
+
+    // Обновляем полоску общего монстра
+    if(document.getElementById('enHp')) document.getElementById('enHp').innerText = raid.monsterHp;
+    if(document.getElementById('enBar') && raid.monsterMaxHp > 0)
+      document.getElementById('enBar').style.width = Math.max(0, (raid.monsterHp*100/raid.monsterMaxHp)) + '%';
+
+    // Только что наступил мой ход - запускаем таймер
+    if(raid.myTurn && !wasMyTurn){
+      updateRaidButtons();
+      resetTimer();
+    }
+    if(!raid.myTurn && wasMyTurn){
+      clearInterval(timerInt);
+      updateRaidButtons();
+    }
+    if(!raid.myTurn) updateRaidButtons();
+
+    if(data.finished){
+      clearInterval(raidPollInt);
+      clearInterval(timerInt);
+      document.getElementById('endOverlay').style.display = 'flex';
+      document.getElementById('endTitle').innerText = data.is_win ? '🏆 ПОБЕДА РЕЙДА!' : '💀 РЕЙД ПРОВАЛЕН!';
+      document.getElementById('endTitle').style.color = data.is_win ? 'gold' : '#ff4d4d';
+    }
+  }catch(e){ console.error(e); }
+}
+
+// Включить рейд - вызывать при загрузке страницы рейда
+function startRaid(myId){
+  raid.enabled = true;
+  raid.myId = myId || 0;
+  pollRaid();
+  raidPollInt = setInterval(pollRaid, 2000); // опрос каждые 2 сек
+}
+
 async function makeAction(type){
   if(type == 'enemy_auto') type = 'enemy_turn';
+  // В РЕЙДЕ: бить можно только в свой ход
+  if(raid.enabled && !raid.myTurn && (type === 'hit' || type === 'super' || type === 'shield')){
+    let txt = document.getElementById('turnText');
+    if(txt) txt.innerText = 'Не твой ход! Сейчас ходит: ' + raid.currentName;
+    return;
+  }
   if(type === 'hit' || type === 'super' || type === 'shield'){
     let now = Date.now();
     if(now - lastAttackTime < ATTACK_COOLDOWN) return;
@@ -99,9 +187,10 @@ async function makeAction(type){
     let data = await resp.json();
     if(data.status === 'redirect'){ window.location.href = data.url; return; }
 
-    if((type == 'hit' || type == 'super' || type == 'shield') && !data.finished){
-  setTimeout(() => makeAction('enemy_turn'), 800);
-}
+    // В рейде enemy_turn НЕ вызываем сами - монстр ходит по кругу на сервере
+    if(!raid.enabled && (type == 'hit' || type == 'super' || type == 'shield') && !data.finished){
+      setTimeout(() => makeAction('enemy_turn'), 800);
+    }
     if(document.getElementById('enHp')) document.getElementById('enHp').innerText = data.enemy_hp;
     if(document.getElementById('enBar')) document.getElementById('enBar').style.width = Math.max(0, (data.enemy_hp*100/data.enemy_max)) + '%';
     if(document.getElementById('myHp')) document.getElementById('myHp').innerText = data.my_hp;
@@ -114,7 +203,6 @@ async function makeAction(type){
       if(document.getElementById('superNeed')) document.getElementById('superNeed').innerText = data.super_used >= 4 ? 'всё!' : 'нужно ' + (data.need_for_next ?? '');
     }
 
-    // Щит сработал - враг ударил на 0
     if(shieldActive && data.edmg === 0){
       shieldActive = false;
       let st = document.getElementById('shieldState');
@@ -128,6 +216,7 @@ async function makeAction(type){
 
     if(data.finished){
       clearInterval(timerInt);
+      if(raidPollInt) clearInterval(raidPollInt);
       document.getElementById('endOverlay').style.display = 'flex';
       if(data.is_win){
         document.getElementById('endTitle').innerText = '🏆 ПОБЕДА!';
@@ -141,14 +230,19 @@ async function makeAction(type){
       return;
     }
 
-    resetTimer();
+    // В рейде таймер запускаем только если снова мой ход - его запустит pollRaid
+    if(!raid.enabled) resetTimer();
+    else pollRaid();
   } catch(e){ console.error(e); }
   finally {
     setTimeout(()=>{
       canAttack = true;
-      if(hitBtn){ hitBtn.disabled = false; hitBtn.classList.remove('cooldown'); }
-      if(superBtn){ superBtn.disabled = false; superBtn.classList.remove('cooldown'); }
-      if(shieldBtn){ shieldBtn.disabled = false; shieldBtn.classList.remove('cooldown'); }
+      if(!raid.enabled || raid.myTurn){
+        if(hitBtn){ hitBtn.disabled = false; hitBtn.classList.remove('cooldown'); }
+        if(superBtn){ superBtn.disabled = false; superBtn.classList.remove('cooldown'); }
+        if(shieldBtn){ shieldBtn.disabled = false; shieldBtn.classList.remove('cooldown'); }
+      }
+      if(raid.enabled) updateRaidButtons();
     }, ATTACK_COOLDOWN);
   }
 }
