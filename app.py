@@ -759,7 +759,7 @@ if fight_owner not in ACTIVE_FIGHTS:
     fight_owner = uid
     session.pop("join_uid", None)
 f = get_fight_db(fight_owner)
-    if not f:
+if not f:
         if "enemy_hp" not in session: return redirect("/promysel")
         f = {"enemy": "warrior", "enemy_hp": session.get("enemy_hp", 20), "enemy_max": session.get("enemy_max", 20), "enemy_dmg_min": session.get("enemy_dmg", [2,4])[0], "enemy_dmg_max": session.get("enemy_dmg", [2,4])[1], "enemy_img": session.get("enemy_img", "ancient_warrior.png"), "enemy_name": session.get("enemy_type", "Древний Воин"), "my_hp": session.get("my_hp", 20), "hit_count": session.get("hit_count", 0), "super_used": session.get("super_used", 0), "super_hits": session.get("super_hits", 0), "shield_active": session.get("shield_active", False), "reward_g": session.get("reward_g", 0), "reward_s": session.get("reward_s", 0), "reward_r": session.get("reward_r", 0), "last_seen": int(time.time())}
         save_fight_db(fight_owner, f)
